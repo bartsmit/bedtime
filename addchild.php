@@ -7,27 +7,26 @@ $wknd = (isset($_GET['week_end']))  ? $_GET['week_end']  : '';
 $ltst = (isset($_GET['latestart'])) ? $_GET['latestart'] : '';
 $ltnd = (isset($_GET['late_end']))  ? $_GET['late_end']  : '';
 $copy = (isset($_GET['copy']))      ? $_GET['copy']      : '';
-$gone = (isset($_GET['remove']))    ? $_GET['remove']    : '';
+$gone = (isset($_GET['gone']))      ? $_GET['gone']      : '';
+$orig = (isset($_GET['origin']))    ? $_GET['origin']    : '';
 $res = squery("select value from settings where variable='weekend'",$mysqli);
 $weekend = $res['value'];
 $weekdays = 254 ^ $weekend;
-if ((isset($_GET['name'])) && ($copy == 'copy')) {
-   $origin = $_GET['origin'];
+if (($name != '') && ($copy == 'copy') && ($orig != '')) {
    $mysqli->query("insert into child set name='$name', description='$desc'");
    $res = squery("select user_id from child where name='$name'",$mysqli);
    $id = $res['user_id'];
-   $mysqli->query("insert into rules (user_id, night, morning, days) select $id, night, morning, days from rules where user_id=$origin");
+   $mysqli->query("insert into rules (user_id, night, morning, days) select $id, night, morning, days from rules where user_id=$orig");
    header("Location: index.php"); 
-} elseif ((isset($_GET['name'])) && (isset($_GET['weekstart'])) && (isset($_GET['week_end'])) && (isset($_GET['latestart'])) && (isset($_GET['late_end']))) {
+} elseif (($name != '') && ($wkst != '') && ($wknd != '') && ($ltst != '') && ($ltnd != '')) {
    $mysqli->query("insert into child set name='$name', description='$desc'");
    $mysqli->query("insert into rules (user_id, night, morning, days) select user_id, '$wkst', '$wknd', $weekdays from child where name='$name'");
    $mysqli->query("insert into rules (user_id, night, morning, days) select user_id, '$ltst', '$ltnd', $weekend  from child where name='$name'");
    header("Location: index.php");
-} elseif (strlen($gone) > 0) {
+} elseif ($gone != '') {
    $mysqli->query("delete from child where user_id=$gone");
    $mysqli->query("delete from rules where user_id=$gone");
-   echo "now be gone with you $gone\n";
-#   header("Location: index.php");
+   header("Location: index.php");
 } else {
    echo "<html><head><title>Add a child</title></head><body>\n";
    echo "<form name=\"addchild\">\n";

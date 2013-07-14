@@ -1,5 +1,5 @@
 <html><head><title>Bedtime</title></head><body>
->> <a href="addchild.php">Add a child</a>
+>> <a href="addchild.php">Add/remove a child</a>
 <hr>
 >> Edit bedtimes
 <form name="main">
