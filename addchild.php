@@ -29,6 +29,7 @@ if (($name != '') && ($copy == 'copy') && ($orig != '')) {
    header("Location: index.php");
 } else {
    echo "<html><head><title>Add a child</title></head><body>\n";
+   echo ">> Add<hr>";
    echo "<form name=\"addchild\">\n";
    $res = $mysqli->query("select user_id,name from child order by name");
    $numrows = $res->num_rows;
@@ -62,7 +63,8 @@ Name: <input type="text" name="name" value="<?php echo $name;?>"> Description: <
 <tr><td>Weekend</td><td>Start:</td><td><input type="text" name="latestart"></td><td>End:</td><td><input type="text" name="late_end"></td></tr>
 <tr><td>School night</td><td>Start:</td><td><input type="text" name="weekstart"></td><td>End:</td><td><input type="text" name="week_end"></td></tr>
 </table>
-<br>
+<hr>
+>> Remove<br>
 <select name="gone">
 <option value=""> </option>
 <?php
