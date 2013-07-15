@@ -1,14 +1,9 @@
 <?php
 include "dbconn.php";
-
-
-?>
-<html><head><title>Bedtime</title></head><body>
->> <a href="addchild.php">Add/remove a child</a>
-<hr>
->> Edit bedtimes
-<form name="main">
-<?php
+$awst = (isset($_GET['a_w_start'])) ? $_GET['a_w_start'] : '';
+$awnd = (isset($_GET['a_w_end']))   ? $_GET['a_w_end']   : '';
+$asst = (isset($_GET['a_s_start'])) ? $_GET['a_s_start'] : '';
+$asnd = (isset($_GET['a_s_end']))   ? $_GET['a_s_end']   : '';
 $res = squery("select value from settings where variable='weekend'",$mysqli);
 $weekend = $res['value']; $weekdays = 254 ^ $weekend;
 $sql = "select child.user_id,name,description,
@@ -17,6 +12,23 @@ $sql = "select child.user_id,name,description,
         max(if(days=$weekdays,night,null)) as s_fm,
         max(if(days=$weekdays,morning,null)) as s_to
         from rules inner join child on child.user_id=rules.user_id group by name";
+$res = $mysqli->query($sql);
+while ($row = $res->fetch_assoc()) {
+   $id  = $row['user_id'];
+   $wst = (isset($_GET['w_start'.$id])) ? $_GET['w_start'.$id] : $row['w_fm'];
+   $wnd = (isset($_GET['w_end'.$id]))   ? $_GET['w_end'.$id]   : $row['w_to'];
+   $sst = (isset($_GET['s_start'.$id])) ? $_GET['s_start'.$id] : $row['s_fm'];
+   $snd = (isset($_GET['s_end'.$id]))   ? $_GET['s_end'.$id]   : $row['s_to'];
+   $mysqli->query("update rules set night='$wst', morning='$wnd' where user_id='$id' and days='$weekend'");
+   $mysqli->query("update rules set night='$sst', morning='$snd' where user_id='$id' and days='$weekdays'");
+} 
+?>
+<html><head><title>Bedtime</title></head><body>
+>> <a href="addchild.php">Add/remove a child</a>
+<hr>
+>> Edit bedtimes
+<form name="main">
+<?php
 $res = $mysqli->query($sql);
 $numrows = $res->num_rows;
 if ($numrows == 0) {
