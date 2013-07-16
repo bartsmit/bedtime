@@ -1,18 +1,27 @@
 <?php
 include "dbconn.php";
-$awst = (isset($_GET['a_w_start'])) ? $_GET['a_w_start'] : '';
-$awnd = (isset($_GET['a_w_end']))   ? $_GET['a_w_end']   : '';
-$asst = (isset($_GET['a_s_start'])) ? $_GET['a_s_start'] : '';
-$asnd = (isset($_GET['a_s_end']))   ? $_GET['a_s_end']   : '';
+$awst = (isset($_GET['a_w_start']))   ? $_GET['a_w_start']   : '';
+$awnd = (isset($_GET['a_w_end']))     ? $_GET['a_w_end']     : '';
+$asst = (isset($_GET['a_s_start']))   ? $_GET['a_s_start']   : '';
+$asnd = (isset($_GET['a_s_end']))     ? $_GET['a_s_end']     : '';
+$grnd = (isset($_GET['ground']))      ? $_GET['ground']      : '';
+$grnu = (isset($_GET['ground_num']))  ? $_GET['ground_num']  : '';
+$grnt = (isset($_GET['ground_time'])) ? $_GET['ground_time'] : '';
+$grnd = (isset($_GET['ground_date'])) ? $_GET['ground_date'] : '';
+$rewd = (isset($_GET['reward']))      ? $_GET['reward']      : '';
+$rewu = (isset($_GET['reward_num']))  ? $_GET['reward_num']  : '';
+$rewt = (isset($_GET['reward_time'])) ? $_GET['reward_time'] : '';
+$rewd = (isset($_GET['reward_date'])) ? $_GET['reward_date'] : '';
+
 $res = squery("select value from settings where variable='weekend'",$mysqli);
 $weekend = $res['value']; $weekdays = 254 ^ $weekend;
-$sql = "select child.user_id,name,description,
-        max(if(days=$weekend, night,null)) as w_fm,
-        max(if(days=$weekend, morning,null)) as w_to,
-        max(if(days=$weekdays,night,null)) as s_fm,
-        max(if(days=$weekdays,morning,null)) as s_to
-        from rules inner join child on child.user_id=rules.user_id group by name";
-$res = $mysqli->query($sql);
+$sql_lst = "select child.user_id,name,description,
+            max(if(days=$weekend, night,null)) as w_fm,
+            max(if(days=$weekend, morning,null)) as w_to,
+            max(if(days=$weekdays,night,null)) as s_fm,
+            max(if(days=$weekdays,morning,null)) as s_to
+            from rules inner join child on child.user_id=rules.user_id group by name";
+$res = $mysqli->query($sql_lst);
 while ($row = $res->fetch_assoc()) {
    $id  = $row['user_id'];
    $wst = (isset($_GET['w_start'.$id])) ? $_GET['w_start'.$id] : $row['w_fm'];
@@ -21,7 +30,31 @@ while ($row = $res->fetch_assoc()) {
    $snd = (isset($_GET['s_end'.$id]))   ? $_GET['s_end'.$id]   : $row['s_to'];
    $mysqli->query("update rules set night='$wst', morning='$wnd' where user_id='$id' and days='$weekend'");
    $mysqli->query("update rules set night='$sst', morning='$snd' where user_id='$id' and days='$weekdays'");
-} 
+}
+if ($grnd != '') {
+print "Got this far<br>";
+   $res = $mysqli->query("select * from ground where user_id='$grnd'");
+   if ($grnu != '') {
+      $end = "date_add(now(),interval cast($grnu as decimal(3,1)) ".$_GET['ground_unit'].")";
+   } elseif (($grnt != '') && ($grnd != '')) {
+      $g_time = explode(':',$grnt);
+      $hour = $g_time[0]; $min = $g_time[1]; $sec = $g_time[2];
+      $g_date = explode('-',$grnd);
+      if (count($g_date) == 2) {
+         $year = date('Y');  $month = $g_date[0]; $day = $g_date[1];
+      } else {
+         $year = $g_date[0]; $month = $g_date[1]; $day = $g_date[2];
+      }
+      $end = ((checkdate($month,$day,$year)) && (preg_match("([01[0-9]|2[0-3] ([0-5][0-9]) ([0-5][0-9])", "$hour $min $sec") === 1)) ? "$grnd $grnt" : "now()";
+   }
+   $sql = ($res->num_rows == 0) ? "insert into ground values ('$grnd',now(),'$end')" : "update ground set start=now(), end='$end' where user_id='$grnd'";
+   $mysqli->query($sql);
+}
+if ($rewd != '') {
+   if ($rewu != '') {
+   } elseif (($rewt !='') && ($rewd != '')) {
+   }
+}
 ?>
 <html><head><title>Bedtime</title></head><body>
 >> <a href="addchild.php">Add/remove a child</a>
@@ -29,7 +62,7 @@ while ($row = $res->fetch_assoc()) {
 >> Edit bedtimes
 <form name="main">
 <?php
-$res = $mysqli->query($sql);
+$res = $mysqli->query($sql_lst);
 $numrows = $res->num_rows;
 if ($numrows == 0) {
    echo "You have not entered any children yet. <a href=\"addchild.php\">Add a child</a>\n";
