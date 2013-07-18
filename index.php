@@ -50,11 +50,7 @@ if ($grni != '') {
          $g_time = explode(':',$grnt);
          $hour = $g_time[0]; $min = $g_time[1]; $sec = $g_time[2];
          $g_date = explode('-',$grnd);
-         if (count($g_date) == 2) {
-            $year = date('Y');  $month = $g_date[0]; $day = $g_date[1];
-         } else {
-            $year = $g_date[0]; $month = $g_date[1]; $day = $g_date[2];
-         }
+         $year = $g_date[0]; $month = $g_date[1]; $day = $g_date[2];
          $end = "'$grnd $grnt'";
       }
       $res = $mysqli->query("select * from ground where user_id='$grni'");
@@ -62,6 +58,7 @@ if ($grni != '') {
    }
    $mysqli->query($sql);
 }
+
 if ($rewi != '') {
    if ($rewu == '0') {
       $sql = "delete from reward where user_id='$rewi'";
@@ -72,11 +69,7 @@ if ($rewi != '') {
          $r_time = explode(':',$rewt);
          $hour = $r_time[0]; $min = $r_time[1]; $sec = $r_time[2];
          $r_date = explode('-',$rewd);
-         if (count($r_date) == 2) {
-            $year = date('Y');  $month = $r_date[0]; $day = $r_date[1];
-         } else {
-            $year = $r_date[0]; $month = $r_date[1]; $day = $r_date[2];
-         }
+         $year = $r_date[0]; $month = $r_date[1]; $day = $r_date[2];
          $end = "'$rewd $rewt'";
       }
       $res = $mysqli->query("select * from reward where user_id='$rewi'");
@@ -131,7 +124,7 @@ foreach ($children as $id => $name) {
 </select> for <input type="text" size="4" name="ground_num"> <select name="ground_unit">
 <option value="hour">hour(s)</option><option value="day">day(s)</option>
 <option value="week">week(s)</option><option vaule="month">month(s)</option>
-</select> Or until <input type="text" size="8" name="ground_time"> hh:mm:ss on <input type="text" size="8" name="ground_date"> (yyyy)-mm-dd<br>
+</select> Or until <input type="text" size="8" name="ground_time"> hh:mm:ss on <input type="text" size="8" name="ground_date"> yyyy-mm-dd<br>
 <br>Remove a child from grounding by grounding them for zero hours
 <hr>
 >> Reward
@@ -145,8 +138,8 @@ foreach ($children as $id => $name) {
 </select> for <input type="text" size="4" name="reward_num"> <select name="reward_unit">
 <option value="hour">hour(s)</option><option value="day">day(s)</option>
 <option value="week">week(s)</option><option vaule="month">month(s)</option>
-</select> Or until <input type="text" size="8" name="reward_time"> hh:mm:ss on <input type="text" size="8" name="reward_date"> (yyyy)-mm-dd<br>
-<br>Remove a child's reward by rewarding them to zero hours.
+</select> Or until <input type="text" size="8" name="reward_time"> hh:mm:ss on <input type="text" size="8" name="reward_date"> yyyy-mm-dd<br>
+<br>Remove a child's reward by rewarding them for zero hours.
 <hr>
 >> <a href="devices.php">Devices</a>
 <hr>
