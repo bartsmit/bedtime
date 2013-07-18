@@ -4,11 +4,11 @@ $awst = (isset($_GET['a_w_start']))   ? $_GET['a_w_start']   : '';
 $awnd = (isset($_GET['a_w_end']))     ? $_GET['a_w_end']     : '';
 $asst = (isset($_GET['a_s_start']))   ? $_GET['a_s_start']   : '';
 $asnd = (isset($_GET['a_s_end']))     ? $_GET['a_s_end']     : '';
-$grnd = (isset($_GET['ground']))      ? $_GET['ground']      : '';
+$grni = (isset($_GET['ground']))      ? $_GET['ground']      : '';
 $grnu = (isset($_GET['ground_num']))  ? $_GET['ground_num']  : '';
 $grnt = (isset($_GET['ground_time'])) ? $_GET['ground_time'] : '';
 $grnd = (isset($_GET['ground_date'])) ? $_GET['ground_date'] : '';
-$rewd = (isset($_GET['reward']))      ? $_GET['reward']      : '';
+$rewi = (isset($_GET['reward']))      ? $_GET['reward']      : '';
 $rewu = (isset($_GET['reward_num']))  ? $_GET['reward_num']  : '';
 $rewt = (isset($_GET['reward_time'])) ? $_GET['reward_time'] : '';
 $rewd = (isset($_GET['reward_date'])) ? $_GET['reward_date'] : '';
@@ -31,29 +31,51 @@ while ($row = $res->fetch_assoc()) {
    $mysqli->query("update rules set night='$wst', morning='$wnd' where user_id='$id' and days='$weekend'");
    $mysqli->query("update rules set night='$sst', morning='$snd' where user_id='$id' and days='$weekdays'");
 }
-if ($grnd != '') {
-print "Got this far<br>";
-   $res = $mysqli->query("select * from ground where user_id='$grnd'");
-   if ($grnu != '') {
-      $end = "date_add(now(),interval cast($grnu as decimal(3,1)) ".$_GET['ground_unit'].")";
-   } elseif (($grnt != '') && ($grnd != '')) {
-      $g_time = explode(':',$grnt);
-      $hour = $g_time[0]; $min = $g_time[1]; $sec = $g_time[2];
-      $g_date = explode('-',$grnd);
-      if (count($g_date) == 2) {
-         $year = date('Y');  $month = $g_date[0]; $day = $g_date[1];
-      } else {
-         $year = $g_date[0]; $month = $g_date[1]; $day = $g_date[2];
+if ($grni != '') {
+   if ($grnu == '0') {
+      $sql = "delete from ground where user_id='$grni'";
+   } else {
+      if ($grnu != '') {
+         $end = "date_add(now(),interval floor($grnu) ".$_GET['ground_unit'].")";
+      } elseif (($grnt != '') && ($grnd != '')) {
+         $g_time = explode(':',$grnt);
+         $hour = $g_time[0]; $min = $g_time[1]; $sec = $g_time[2];
+         $g_date = explode('-',$grnd);
+         if (count($g_date) == 2) {
+            $year = date('Y');  $month = $g_date[0]; $day = $g_date[1];
+         } else {
+            $year = $g_date[0]; $month = $g_date[1]; $day = $g_date[2];
+         }
+         $end = "'$grnd $grnt'";
+#((checkdate($month,$day,$year)) && (preg_match("/(2[0-3]|[01][0-9]):[0-5][0-9]:[0-5][0-9]/", "$hour:$min:$sec"))) ? "$grnd $grnt" : "now()";
       }
-      $end = ((checkdate($month,$day,$year)) && (preg_match("([01[0-9]|2[0-3] ([0-5][0-9]) ([0-5][0-9])", "$hour $min $sec") === 1)) ? "$grnd $grnt" : "now()";
+      $res = $mysqli->query("select * from ground where user_id='$grni'");
+      $sql = ($res->num_rows == 0) ? "insert into ground values ('$grni',now(),$end)" : "update ground set start=now(), end=$end where user_id='$grni'";
    }
-   $sql = ($res->num_rows == 0) ? "insert into ground values ('$grnd',now(),'$end')" : "update ground set start=now(), end='$end' where user_id='$grnd'";
    $mysqli->query($sql);
 }
-if ($rewd != '') {
-   if ($rewu != '') {
-   } elseif (($rewt !='') && ($rewd != '')) {
+if ($rewi != '') {
+   if ($rewu == '0') {
+      $sql = "delete from reward where user_id='$rewi'";
+   } else {
+      if ($rewu != '') {
+         $end = "date_add(now(),interval floor($rewu) ".$_GET['reward_unit'].")";
+      } elseif (($rewt !='') && ($rewd != '')) {
+         $r_time = explode(':',$rewt);
+         $hour = $r_time[0]; $min = $r_time[1]; $sec = $r_time[2];
+         $r_date = explode('-',$rewd);
+         if (count($r_date) == 2) {
+            $year = date('Y');  $month = $r_date[0]; $day = $r_date[1];
+         } else {
+            $year = $r_date[0]; $month = $r_date[1]; $day = $r_date[2];
+         }
+         $end = "'$rewd $rewt'";
+#((checkdate($month,$day,$year)) && (preg_match("/(2[0-3]|[01][0-9]):[0-5][0-9]:[0-5][0-9]/", "$hour:$min:$sec"))) ? "$rewd $rewt" : "now()";
+      }
+      $res = $mysqli->query("select * from reward where user_id='$rewi'");
+      $sql = ($res->num_rows == 0) ? "insert into reward values ('$rewi',now(),$end)" : "update reward set start=now(), end=$end where user_id='$rewi'";
    }
+   $mysqli->query($sql);
 }
 ?>
 <html><head><title>Bedtime</title></head><body>
@@ -99,7 +121,8 @@ foreach ($children as $id => $name) {
 </select> for <input type="text" size="4" name="ground_num"> <select name="ground_unit">
 <option value="hour">hour(s)</option><option value="day">day(s)</option>
 <option value="week">week(s)</option><option vaule="month">month(s)</option>
-</select> Or until <input type="text" size="8" name="ground_time"> hh:mm:ss on <input type="text" size="8" name="ground_date"> (yyyy)-mm-dd
+</select> Or until <input type="text" size="8" name="ground_time"> hh:mm:ss on <input type="text" size="8" name="ground_date"> (yyyy)-mm-dd<br>
+<br>Remove a child from grounding by grounding them for zero hours
 <hr>
 >> Reward
 <select name="reward">
@@ -112,12 +135,14 @@ foreach ($children as $id => $name) {
 </select> for <input type="text" size="4" name="reward_num"> <select name="reward_unit">
 <option value="hour">hour(s)</option><option value="day">day(s)</option>
 <option value="week">week(s)</option><option vaule="month">month(s)</option>
-</select> Or until <input type="text" size="8" name="reward_time"> hh:mm:ss on <input type="text" size="8" name="reward_date"> (yyyy)-mm-dd
+</select> Or until <input type="text" size="8" name="reward_time"> hh:mm:ss on <input type="text" size="8" name="reward_date"> (yyyy)-mm-dd<br>
+<br>Remove a child's reward by rewarding them to zero hours.
 <hr>
 >> <a href="devices.php">Devices</a>
 <hr>
 >> <a href="settings.php">Settings</a>
 <hr>
 <input type="submit" value="submit">
-</form>
+</form><br>
+Cancel and <a href="index.php">reset</a>
 </body></html>

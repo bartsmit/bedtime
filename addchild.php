@@ -73,6 +73,7 @@ foreach ($children as $id => $name) {
 }
 ?>
 </select> Is responsible enough to switch off their devices for bed. Remove them from bedtime.<br><br>
-<input type="submit" value="submit"><br>Cancel and <a href="index.php">return</a>
+<input type="submit" value="submit">
 </form>
+<br>Cancel and <a href="index.php">return</a>
 </body></html>
