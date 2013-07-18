@@ -1,5 +1,6 @@
 <?php
 include "dbconn.php";
+$sall = (isset($_GET['sel_all']));
 $awst = (isset($_GET['a_w_start']))   ? $_GET['a_w_start']   : '';
 $awnd = (isset($_GET['a_w_end']))     ? $_GET['a_w_end']     : '';
 $asst = (isset($_GET['a_s_start']))   ? $_GET['a_s_start']   : '';
@@ -13,9 +14,12 @@ $rewu = (isset($_GET['reward_num']))  ? $_GET['reward_num']  : '';
 $rewt = (isset($_GET['reward_time'])) ? $_GET['reward_time'] : '';
 $rewd = (isset($_GET['reward_date'])) ? $_GET['reward_date'] : '';
 
+$four = (($awst != '') && ($awnd != '') && ($asst != '') && ($asnd != ''));
 $res = squery("select value from settings where variable='weekend'",$mysqli);
 $weekend = $res['value']; $weekdays = 254 ^ $weekend;
 $sql_lst = "select child.user_id,name,description,
+            (select count(*) from ground where ground.user_id=rules.user_id) as gc,
+            (select count(*) from reward where reward.user_id=rules.user_id) as rc,
             max(if(days=$weekend, night,null)) as w_fm,
             max(if(days=$weekend, morning,null)) as w_to,
             max(if(days=$weekdays,night,null)) as s_fm,
@@ -24,13 +28,18 @@ $sql_lst = "select child.user_id,name,description,
 $res = $mysqli->query($sql_lst);
 while ($row = $res->fetch_assoc()) {
    $id  = $row['user_id'];
-   $wst = (isset($_GET['w_start'.$id])) ? $_GET['w_start'.$id] : $row['w_fm'];
-   $wnd = (isset($_GET['w_end'.$id]))   ? $_GET['w_end'.$id]   : $row['w_to'];
-   $sst = (isset($_GET['s_start'.$id])) ? $_GET['s_start'.$id] : $row['s_fm'];
-   $snd = (isset($_GET['s_end'.$id]))   ? $_GET['s_end'.$id]   : $row['s_to'];
+   if (($four) && (($sall) || (isset($_GET['sel'.$id])))) {
+      $wst = $awst; $wnd = $awnd; $sst = $asst; $snd = $asnd;
+   } else {
+      $wst = (isset($_GET['w_start'.$id])) ? $_GET['w_start'.$id] : $row['w_fm'];
+      $wnd = (isset($_GET['w_end'.$id]))   ? $_GET['w_end'.$id]   : $row['w_to'];
+      $sst = (isset($_GET['s_start'.$id])) ? $_GET['s_start'.$id] : $row['s_fm'];
+      $snd = (isset($_GET['s_end'.$id]))   ? $_GET['s_end'.$id]   : $row['s_to'];
+   }
    $mysqli->query("update rules set night='$wst', morning='$wnd' where user_id='$id' and days='$weekend'");
    $mysqli->query("update rules set night='$sst', morning='$snd' where user_id='$id' and days='$weekdays'");
 }
+
 if ($grni != '') {
    if ($grnu == '0') {
       $sql = "delete from ground where user_id='$grni'";
@@ -47,7 +56,6 @@ if ($grni != '') {
             $year = $g_date[0]; $month = $g_date[1]; $day = $g_date[2];
          }
          $end = "'$grnd $grnt'";
-#((checkdate($month,$day,$year)) && (preg_match("/(2[0-3]|[01][0-9]):[0-5][0-9]:[0-5][0-9]/", "$hour:$min:$sec"))) ? "$grnd $grnt" : "now()";
       }
       $res = $mysqli->query("select * from ground where user_id='$grni'");
       $sql = ($res->num_rows == 0) ? "insert into ground values ('$grni',now(),$end)" : "update ground set start=now(), end=$end where user_id='$grni'";
@@ -70,7 +78,6 @@ if ($rewi != '') {
             $year = $r_date[0]; $month = $r_date[1]; $day = $r_date[2];
          }
          $end = "'$rewd $rewt'";
-#((checkdate($month,$day,$year)) && (preg_match("/(2[0-3]|[01][0-9]):[0-5][0-9]:[0-5][0-9]/", "$hour:$min:$sec"))) ? "$rewd $rewt" : "now()";
       }
       $res = $mysqli->query("select * from reward where user_id='$rewi'");
       $sql = ($res->num_rows == 0) ? "insert into reward values ('$rewi',now(),$end)" : "update reward set start=now(), end=$end where user_id='$rewi'";
@@ -91,7 +98,7 @@ if ($numrows == 0) {
 } else {
    $children = array();
    echo "<table border=\"0\">\n";
-   echo "<th>Name</th><th>Description</th><th>Set <input type=\"checkbox\" name=\"sel_all\" value=\"all\"></th>";
+   echo "<th>Name</th><th>Description</th><th>Set <input type=\"checkbox\" name=\"sel_all\" value=\"sel_all\"></th>";
    echo "<th>Weekend from: <input type=\"text\" name=\"a_w_start\" size=\"8\"></th>";
    echo "<th>to: <input type=\"text\" name=\"a_w_end\" size=\"8\"></th>";
    echo "<th>School night from: <input type=\"text\" name=\"a_s_start\" size=\"8\"></th>";
@@ -100,7 +107,10 @@ if ($numrows == 0) {
       $id = $row['user_id']; $cn = $row['name']; $ds = $row['description'];
       $children[$id] = $cn;
       $wf = $row['w_fm'];$wt = $row['w_to']; $sf = $row['s_fm']; $st = $row['s_to'];
-      echo "<tr><td>$cn</td><td align=\"right\">$ds</td><td align=\"right\"><input type=\"checkbox\" name=\"$id\" value=\"$id\"></td>\n";
+      $gn = ($row['gc'] > 0) ? ' <strong>G</strong>' : '';
+      $rn = ($row['rc'] > 0) ? ' <strong>R</strong>' : '';
+      echo "<tr><td>$cn</td><td align=\"right\">$ds</td><td align=\"right\">";
+      echo $gn.$rn."<input type=\"checkbox\" name=\"sel$id\" value=\"sel$id\"></td>\n";
       echo "<td align=\"right\"><input type=\"text\" name=\"w_start$id\" value=\"$wf\" size=\"8\"></td>\n";
       echo "<td align=\"right\"><input type=\"text\" name=\"w_end$id\" value=\"$wt\" size=\"8\"></td>\n";
       echo "<td align=\"right\"><input type=\"text\" name=\"s_start$id\" value=\"$sf\" size=\"8\"></td>\n";
