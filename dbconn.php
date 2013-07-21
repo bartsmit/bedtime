@@ -7,7 +7,12 @@ foreach ($conf as $line) {
    $bits = preg_split("/\s*=\s*/",$line);
    $vals[$bits[0]] = rtrim($bits[1]);
 }
+
 $mysqli = new mysqli ($vals["dbhost"], $vals["dbwrite"], $vals["dbwpass"], $vals["dbname"]);
+
+if ($mysqli->connect_errno) {
+   printf("Connect failed: %s\n",$mysqli->connect_error);
+}
 
 function squery($sql,$mysqli) {
    if ($result = $mysqli->query($sql)) {
