@@ -23,67 +23,41 @@ use strict;
 use DBI;
 use Getopt::Std;
 use POSIX;
+use BedtimeDB;
+use File::Basename;
 
-# Read the conf file into an array and filter out all lines consisting of just white space and comments
-open (CONF,'/etc/bedtime.conf') or die "Cannot open configuration file - $!\n";
-my @conf = <CONF>; close CONF;
-@conf = grep (!/^\s*$/,@conf);
-@conf = grep (!/^#/,@conf);
+# Path to the perl scripts
+my $path = dirname($0);
 
-# Read the remaining lines into a hash split on =
-my %vals;
-foreach (@conf) {
-   chomp;
-   my @pair = split(/\s*=\s*/);
-   $vals{$pair[0]}=$pair[1];
-}
+# Connect to the database
+my $dbh = &BedtimeDB::dbconn;
 
-# Collect the credentials and connect to the database
-my $user = $vals{'dbuser'};
-my $pass = $vals{'dbupass'};
-my $dbis = "DBI:mysql:".$vals{'dbname'}.":".$vals{'dbhost'};
-my $dbh = DBI->connect($dbis,$user,$pass) or die "Cannot connect to database $dbis with user $user - $!\n";
-
-# Option u for update, d for dhcp, otherwise go daemon
-getopts('du');
-our($opt_d,$opt_u);
-
-my $dieNow  = 0;
-my $logging = 1;
-my $pidFile;
+# Option d for dhcp, u for update, m for manufacturers, t for tail leases, otherwise go daemon
+getopts('dumt');
+our($opt_d,$opt_u,$opt_m,$opt_t);
 
 if ($opt_d) {
-   slurpDHCP();
-   exit;
+   exec ("$path/dhcp_slurp.pl");
 } elsif ($opt_u) {
-   updateIPtables();
-   exit;
+   exec ("$path/update_ipt.pl");
+} elsif ($opt_m) {
+   exec ("$path/get_manlst.pl");
 } else {
    # Get the logging variable from the database
-   my $sth = $dbh->prepare("select value from settings where variable='logging';") or die "Cannot prepare query: $dbh->errstr";
-   my $res = $sth->execute or die "Cannot execute query: $sth->errstr";
-   my $logvar = $sth->fetchrow_array();
-   $res = $sth->finish;
-   $logging = 0 if ($logvar == 'no'); 
+   my $logging = &BedtimeDB::get_val('logging');
 
    # And the log path
-   $sth = $dbh->prepare("select value from settings where variable='logpath';") or die "Cannot prepare query: $dbh->errstr";
-   my $res = $sth->execute or die "Cannot execute query: $sth->errstr";
-   my $logFilePath = $sth->fetchrow_array();
-   $res = $sth->finish;
+   my $logFilePath = &BedtimeDB::get_val('logpath');
 
    # And the pid path
-   $sth = $dbh->prepare("select value from settings where variable='pidpath';") or die "Cannot prepare query: $dbh->errstr";
-   my $res = $sth->execute or die "Cannot execute query: $sth->errstr";
-   my $pidFilePath = $sth->fetchrow_array();
-   $res = $sth->finish;
+   my $pidFilePath = &BedtimeDB::get_val('pidpath');
 
    my $daemonName    = $0;
-   my $sleepMainLoop = 2;                                     # number of seconds to wait between "do something" execution after queue is clear
+   my $sleepMainLoop = 120;
    my $logFile       = $logFilePath . $daemonName . ".log";
    my $pidFile       = $pidFilePath . $daemonName . ".pid";
 
-   # daemonizs
+   # Do the daemon stuff
    use POSIX qw(setsid);
    chdir '/';
    umask 0;
@@ -113,9 +87,16 @@ if ($opt_d) {
    } 
 
    # "infinite" loop where some useful process happens
-   until ($dieNow) {
-      sleep($sleepMainLoop);
-      # logEntry("log something"); # use this to log whatever you need to
+   if ($opt_t) {
+      open my $pipe, "-|", "/usr/bin/tail", "-f", "/var/log/messages" or die "could not start tail on SampleLog.log: $!";
+      while (<$pipe>) {
+         system('/usr/share/bedtime/perl/dhcp_slurp') if (m/dhcpd: Wrote \d+ leases to leases file/);
+      }
+   } else {
+      while (1) {
+         sleep($sleepMainLoop);
+         # logEntry("log something"); # use this to log whatever you need to
+      }
    }
 }
 
@@ -131,7 +112,10 @@ sub logEntry {
 
 # catch signals and end the program if one is caught.
 sub signalHandler {
-   $dieNow = 1;    # this will cause the "infinite loop" to exit
+   unlink $pidFile;
+   $dbh->disconnect;
+   close LOG if ($logging);
+   exit();
 }
 
 # do this stuff when exit() is called.
@@ -139,49 +123,4 @@ END {
    close LOG if ($logging);
    $dbh->disconnect;
    unlink $pidFile;
-}
-
-sub slurpDHCP {
-   # Get leases file from the settings table
-   my $sth = $dbh->prepare("select value from settings where variable='dhcp_leases';") or die "Cannot prepare query: $dbh->errstr";
-   my $res = $sth->execute or die "Cannot execute query: $sth->errstr";
-   my $lease_f = $sth->fetchrow_array();
-   $res = $sth->finish;
-
-   # Slurp the leases file into a hash
-   open (LEASE,$lease_f);
-   my @lease = <LEASE>; close(LEASE);
-
-   # The only things we care about are the MAC and the IP
-   my @devs = grep { $_ =~ /^\s*lease|^\s*hardware/} @lease;
-   my $devs = join("", @devs);
-   # Replace the newline between the IP and the MAC with a ### marker
-   $devs =~ s/\s*{\s*\n\s*/###/g;
-   # Get rid of the text to leave just IP###MAC
-   $devs =~ s/\s*lease\s*|\s*hardware ethernet\s*//g;
-   # Remove the trailing ; from the MAC
-   $devs =~ s/;/\n/g;
-   chomp($devs);
-   # Create an array from the devices string and parse each line
-   @devs = split(/\n/,$devs);
-   foreach (@devs) {
-      my @row = split(/###/);
-      my $ip = $row[0]; my $mac = $row[1];
-      # Remove the : separators and set to uppercase
-      $mac =~ s/://g; $mac = uc($mac);
-      # Find if the device is already in the database
-      $sth = $dbh->prepare("select count(*) from device where lpad(hex(mac),12,'0')=lpad('$mac',12,'0');") or die "Cannot prepare query: $dbh->errstr";
-      $res = $sth->execute or die "Cannot execute query: $sth->errstr";
-      my $sql;
-      if ($sth->fetchrow_array() > 0) {
-         # If it is already in the database, just update the IP. Leave owner and first seen data intact
-         $sql = "update device set ip=inet_aton('$ip') where lpad(hex(mac),12,'0')=lpad('$mac',12,'0');";
-      } else {
-         # A new device gets first seen
-         $sql = "insert into device set mac=x'$mac', ip=inet_aton('$ip'), first_seen=now();";
-      }
-      $res = $sth->finish;
-      $sth = $dbh->prepare($sql) or die "Cannot prepare query: $dbh->errstr";
-      $res = $sth->execute or die "Cannot execute query: $sth->errstr";
-    }
 }
