@@ -36,6 +36,8 @@ my $dbh = &BedtimeDB::dbconn;
 getopts('dumt');
 our($opt_d,$opt_u,$opt_m,$opt_t);
 
+my ($logging, $pidFile); 
+
 if ($opt_d) {
    exec ("$path/dhcp_slurp.pl");
 } elsif ($opt_u) {
@@ -90,11 +92,12 @@ if ($opt_d) {
    if ($opt_t) {
       open my $pipe, "-|", "/usr/bin/tail", "-f", "/var/log/messages" or die "could not start tail on SampleLog.log: $!";
       while (<$pipe>) {
-         system('/usr/share/bedtime/perl/dhcp_slurp') if (m/dhcpd: Wrote \d+ leases to leases file/);
+         system("$path/dhcp_slurp") if (m/dhcpd: Wrote \d+ leases to leases file/);
       }
    } else {
       while (1) {
          sleep($sleepMainLoop);
+         
          # logEntry("log something"); # use this to log whatever you need to
       }
    }

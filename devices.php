@@ -1,3 +1,9 @@
+<style>
+table, td, th
+{
+padding: 1px 5px;
+}
+</style>
 <?php
 include "dbconn.php";
 $res = $mysqli->query("select user_id, name from child order by name");
@@ -12,15 +18,53 @@ if ($numrows > 0) {
 } else {
    header("Location: addchild.php");
 }
-$sql  = "select inet_ntoa(ip) as ip, (select short from manufacturers where
-         (manufacturers.mac & x'FFFFFF000000') = (device.mac & x'FFFFFF000000') or
-         (manufacturers.mac & x'FFFFFFFFF000') = (device.mac & x'FFFFFFFFF000'))
-         as vendor, first_seen as first from device";
+echo "<html><head><title>Manage Devices</title></head><body>\n";
+echo "Assign a child to each device from the drop-down list. Delete devices that are no longer around<br>\n";
+$sql  = "select inet_ntoa(ip) as ip,
+         (select name from child where device.user_id = child.user_id) as owner,
+         (select short from manufacturers where
+            (manufacturers.mac & x'FFFFFF000000') = (device.mac & x'FFFFFF000000') or
+            (manufacturers.mac & x'FFFFFFFFF000') = (device.mac & x'FFFFFFFFF000')) as vendor,
+         lpad(hex(mac),12,'0') as mac,
+         first_seen as first,
+         user_id as id from device;";
 $res = $mysqli->query($sql);
+echo "<form name=\"devices\"><table borders=\"0\">\n";
+echo "<th>Owner</th><th>Make</th><th>MAC</th><th>IP address</th><th>First seen</th><th>Delete</th>\n";
+$kill_list = '';
 while($obj = $res->fetch_object()) {
-   printf("The device with ip %s was made by %s and first seen on %s <br>\n",$obj->ip, $obj->vendor, $obj->first);
+   $did    = $obj->id;
+   $owner  = $obj->owner;
+   $mac    = $obj->mac;
+   $ip     = $obj->ip;
+   $vendor = $obj->vendor;
+   $first  = $obj->first;
+   $newid  = (isset($_GET["o_$mac"])) ? $_GET["o_$mac"] : '0';
+   $remove = (isset($_GET["d_$mac"])) ? $_GET["d_$mac"] : '';
+   if (($newid <> '0') && ($newid <> $did)) {
+      # The new owner is non-zero and different from the one in the database
+      $mysqli->query("update device set user_id=$newid where lpad(hex(mac),12,'0') = '$mac'");
+      $did = $newid;
+   }
+   if ($remove == '') {
+      echo "<tr><td><select name=\"o_$mac\">\n";
+      foreach ($children as $id => $name) {
+         echo "<option value=\"$id\""; 
+         if ($did == $id) { echo " selected"; }
+         echo ">$name</option>\n";
+      }
+      $dis_mac = rtrim(strtolower(chunk_split($mac,2,'-')),'-');
+      echo "</select></td><td>$vendor</td><td>$dis_mac</td><td>$ip</td><td>$first</td>\n";
+      echo "<td><input type=\"checkbox\" name=\"d_$mac\" value=\"d_$mac\"></td></tr>\n";
+   } else {
+      $kill_list .= "x'$mac',";
+   }
 }
-#while ($row = $res->fetch_assoc()) {
-#   sprintf("The device has a mac of %s, is owned by %s and first seen on %s <br>\n", $row['mac'], $row['id'],$row['first']);
-#}
+$kill_list = rtrim($kill_list,',');
+$res = $mysqli->query("delete from device where mac in ($kill_list)");
 ?>
+</table><br>
+<input type="submit" value="submit">
+</form>
+<a href="index.php">return</a>
+</body></html>
