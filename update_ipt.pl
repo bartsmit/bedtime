@@ -8,8 +8,37 @@ use strict;
 my @weekdays = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
 
 # We only care about forward filter rules and prerouting nat rules
-my @frules = `iptables -L FORWARD --line-numbers | grep MAC`;
-my @nrules = `iptables -t nat -L PREROUTING --line-numbers | grep MAC`;
+my @frules = `iptables -L FORWARD --line-numbers | grep MAC | grep REJECT`;
+my @nrules = `iptables -t nat -L PREROUTING --line-numbers | grep MAC | grep REJECT`;
+
+# Split up the rules into components starting with the time rules
+my @ftrules = grep {$_ =~ / TIME from /} @frules;
+foreach (@ftrules) {
+   my @bits   = split(/ TIME from /);
+   my @bobs   = split(/\s*REJECT\s*/,$bits[0]);
+   my $line   = $bobs[0];
+   my @bobs   = split(/\s*MAC\s*/,$bobs[1]);
+   my $mac    = $bobs[1];
+   my @bobs   = split(/\s*to\s*/,$bits[1]);
+   my $start  = $bobs[0];
+   my @bobs   = split(/reject-with icmp-port-unreachable/,$bobs[1]);
+   my $finish = '';
+   my $days   = '';
+   my $bits   = 0;
+   if ($bobs[0] =~ /\s+on\s+/) {
+       @bobs = split(/\s+on\s+/,$bobs[0]);
+       $finish = $bobs[0];
+       $days = $bobs[1];
+       for (my $i=0;$i<8;$i++) {
+          my $try = $weekdays[$i];
+          $bits = $bits | (128 >> $i) if ($days =~ /$try/);
+       }
+   } else {
+      $finish = $bobs[0];
+   }
+print "Rule # $line stops $mac from $start to $finish on $days coded as $bits\n";
+}
+die "Done for now\n";
 
 # update iptables with rules in $tables
 my $tables = '';
@@ -30,12 +59,12 @@ while (my @row = $sth->fetchrow_array()) {
    my $mac = join(":",($row[0] =~ m/../g));
    my @ipt = grep {$_ =~ /$mac/} @frules;
    foreach (@ipt) {
-      m/^\d+/;
+      m/^\d*/;
       $tables .= "iptables -D FORWARD $1\n";
    }
    @ipt = grep {$_ =~ /$mac/} @nrules;
    foreach (@ipt) {
-      m/^\d+/;
+      m/^\d*/;
       $tables .= "iptables -t nat -D PREROUTING $1\n";
    }
 
