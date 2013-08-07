@@ -7,37 +7,69 @@ use strict;
 # Create array of days of the week
 my @weekdays = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
 
-# We only care about forward filter rules and prerouting nat rules
-my @frules = `iptables -L FORWARD --line-numbers | grep MAC | grep REJECT`;
-my @nrules = `iptables -t nat -L PREROUTING --line-numbers | grep MAC | grep REJECT`;
+# We only care about reject forward rules, redirect nat rules and accept rules
+my @f_rules = `iptables -L FORWARD --line-numbers | grep MAC | grep REJECT`;
+my @n_rules = `iptables -t nat -L PREROUTING --line-numbers | grep MAC | grep REDIRECT`;
+my @r_rules = `iptables -L FORWARD --line-numbers | grep MAC | grep ACCEPT`;
 
-# Split up the rules into components starting with the time rules
-my @ftrules = grep {$_ =~ / TIME from /} @frules;
-foreach (@ftrules) {
+# Set up the bedtime, ground and reward arrays
+my @f_bt_ru_a;
+my @f_gr_ru_a;
+my @f_rw_ru_a;
+
+# Process the bedtime rules
+foreach (grep(/ TIME from /, @f_rules)) {
    my @bits   = split(/ TIME from /);
    my @bobs   = split(/\s*REJECT\s*/,$bits[0]);
    my $line   = $bobs[0];
-   my @bobs   = split(/\s*MAC\s*/,$bobs[1]);
+   @bobs      = split(/\s*MAC\s*/,$bobs[1]);
    my $mac    = $bobs[1];
-   my @bobs   = split(/\s*to\s*/,$bits[1]);
+   @bobs      = split(/\s*to\s*/,$bits[1]);
    my $start  = $bobs[0];
-   my @bobs   = split(/reject-with icmp-port-unreachable/,$bobs[1]);
+   @bobs      = split(/reject-with icmp-port-unreachable/,$bobs[1]);
    my $finish = '';
    my $days   = '';
-   my $bits   = 0;
+   my $mask   = 0;
    if ($bobs[0] =~ /\s+on\s+/) {
        @bobs = split(/\s+on\s+/,$bobs[0]);
        $finish = $bobs[0];
        $days = $bobs[1];
        for (my $i=0;$i<8;$i++) {
           my $try = $weekdays[$i];
-          $bits = $bits | (128 >> $i) if ($days =~ /$try/);
+          $mask = $mask | (128 >> $i) if ($days =~ /$try/);
        }
    } else {
       $finish = $bobs[0];
    }
-print "Rule # $line stops $mac from $start to $finish on $days coded as $bits\n";
+   push (@f_bt_ru_a,{line=>$line, mac=>$mac, start=>$start, finish=>$finish, bits=>$mask});
 }
+
+# Now the ground rules
+foreach (grep (!/ TIME from /, @f_rules)) {
+   my @bits = split(/\s*MAC\s*/);
+   my @bobs = split(/\s*reject-with\s*/,$bits[1]);
+   my $mac  = $bobs[0];
+   @bobs    = split(/\s*REJECT\s*/,$bits[0]);
+   my $line = $bobs[0];
+   push (@f_gr_ru_a,{line=>$line, mac=>$mac});
+}
+
+# And finally the reward rules
+foreach (@r_rules) {
+   my @bits = split(/\s*MAC\s*/);
+   my @bobs = split(/\s*-j ACCEPT/,$bits[1]);
+   my $mac  = $bobs[0];
+   @bobs    = split(/\s*ACCEPT\s*/,$bits[0]);
+   my $line = $bobs[0];
+   push (@f_rw_ru_a,{line=>$line, mac=>$mac});
+}
+
+print "Bedtime rules\n";
+print "$_->{line} : $_->{mac} from $_->{start} to $_->{finish} on $_->{bits}\n" foreach(@f_bt_ru_a);
+print "Grounded rules\n";
+print "$_->{line} : $_->{mac}\n" foreach(@f_gr_ru_a);
+print "Reward rules\n";
+print "$_->{line} : $_->{mac}\n" foreach(@f_rw_ru_a);
 die "Done for now\n";
 
 # update iptables with rules in $tables
@@ -57,12 +89,12 @@ $sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from rules inne
 $res = $sth->execute or die "Cannot execute query: $sth->errstr";
 while (my @row = $sth->fetchrow_array()) {
    my $mac = join(":",($row[0] =~ m/../g));
-   my @ipt = grep {$_ =~ /$mac/} @frules;
+   my @ipt = grep {$_ =~ /$mac/} @f_rules;
    foreach (@ipt) {
       m/^\d*/;
       $tables .= "iptables -D FORWARD $1\n";
    }
-   @ipt = grep {$_ =~ /$mac/} @nrules;
+   @ipt = grep {$_ =~ /$mac/} @n_rules;
    foreach (@ipt) {
       m/^\d*/;
       $tables .= "iptables -t nat -D PREROUTING $1\n";
