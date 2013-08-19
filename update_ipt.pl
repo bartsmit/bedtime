@@ -7,7 +7,23 @@ use strict;
 # Create array of days of the week
 my @weekdays = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
 
-# We only care about reject forward rules, redirect nat rules and accept rules
+# Connect to the database
+my $dbh = &BedtimeDB::dbconn;
+
+# Get my IP address
+my $sth = $dbh->prepare("select value from settings where variable='myip'");
+my $res = $sth->execute or die "Cannot execute query: $sth->errstr";
+my @row = $sth->fetchrow_array();
+my $myip = $row[0];
+
+# Get all the new rules from the database
+my $sql  = "select lpad(hex(device.mac),12,'0') as mac, night, morning, days ";
+   $sql .= "from rules inner join device on rules.user_id=device.user_id";
+my $sth = $dbh->prepare($sql);
+$sth->execute();
+my $all = $sth->fetchall_arrayref();
+
+# Get all the current reject, redirect nat rules and accept rules with a MAC filter
 my @f_rules = `iptables -L FORWARD --line-numbers | grep MAC | grep REJECT`;
 my @n_rules = `iptables -t nat -L PREROUTING --line-numbers | grep MAC | grep REDIRECT`;
 my @r_rules = `iptables -L FORWARD --line-numbers | grep MAC | grep ACCEPT`;
@@ -40,6 +56,7 @@ foreach (grep(/ TIME from /, @f_rules)) {
        }
    } else {
       $finish = $bobs[0];
+      $mask   = 0;
    }
    push (@f_bt_ru_a,{line=>$line, mac=>$mac, start=>$start, finish=>$finish, bits=>$mask});
 }
@@ -64,6 +81,28 @@ foreach (@r_rules) {
    push (@f_rw_ru_a,{line=>$line, mac=>$mac});
 }
 
+# Set the string for iptables modifications
+my $tables = '';
+
+# Look for bedtime rules with new times
+foreach my $old (@f_bt_ru_a) {
+   foreach my $new (@$all) {
+      my ($mac, $night, $morning, $days) = $new;
+      if (($mac eq $old->{mac}) && ($days eq $old->{days})) {
+         # Add a modify rule if there is a change
+         $tables .= "Gon swop $old->{night} to $night and $old->{morning} to $morning for $mac on $days\n"
+            unless (($night eq $old->{night}) && ($morning eq $old->{morning}));
+         # No need to continue with the inner loop
+         last;
+      }
+   }
+}
+
+# Now all the new rules need to be added and old rules deleted
+
+print "$tables\n";
+die "that'll do\n";
+
 print "Bedtime rules\n";
 print "$_->{line} : $_->{mac} from $_->{start} to $_->{finish} on $_->{bits}\n" foreach(@f_bt_ru_a);
 print "Grounded rules\n";
@@ -74,15 +113,6 @@ die "Done for now\n";
 
 # update iptables with rules in $tables
 my $tables = '';
-
-# Connect to the database
-my $dbh = &BedtimeDB::dbconn;
-
-# Get my IP address
-my $sth = $dbh->prepare("select value from settings where variable='myip'");
-my $res = $sth->execute or die "Cannot execute query: $sth->errstr";
-my @row = $sth->fetchrow_array();
-my $myip = $row[0];
 
 # Get all mac addresses with rules to create delete iptables commands
 $sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from rules inner join device on rules.user_id=device.user_id group by mac");
@@ -129,3 +159,12 @@ while (my @row = $sth->fetchrow_array()) {
 }
 print $tables;
 #exec($tables);
+
+# Find the number of seconds since midnight of a time in hh:mm:ss
+sub time2secs {
+   my $time = shift;
+   my @bits = split(/:/,$time);
+   my $secs = $bits[0] * 3600 + $bits[1] * 60 + $bits[2];
+      $secs = $bits[0] * 3600 + $bits[1] * 60 if $#bits == 1;
+   $secs;
+}
