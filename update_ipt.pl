@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-use BedtimeDB;
+use BedtimeDB qw(get_val);
 use DBI;
 use strict;
 
@@ -11,22 +11,32 @@ my @weekdays = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
 my $dbh = &BedtimeDB::dbconn;
 
 # Get my IP address
-my $sth = $dbh->prepare("select value from settings where variable='myip'");
-my $res = $sth->execute or die "Cannot execute query: $sth->errstr";
-my @row = $sth->fetchrow_array();
-my $myip = $row[0];
-
-# Get all the new rules from the database
-my $sql  = "select lpad(hex(device.mac),12,'0') as mac, night, morning, days ";
-   $sql .= "from rules inner join device on rules.user_id=device.user_id";
-my $sth = $dbh->prepare($sql);
-$sth->execute();
-my $all = $sth->fetchall_arrayref();
+my $myip = get_val('myip');
 
 # Get all the current reject, redirect nat rules and accept rules with a MAC filter
 my @f_rules = `iptables -L FORWARD --line-numbers | grep MAC | grep REJECT`;
 my @n_rules = `iptables -t nat -L PREROUTING --line-numbers | grep MAC | grep REDIRECT`;
 my @r_rules = `iptables -L FORWARD --line-numbers | grep MAC | grep ACCEPT`;
+
+# Collect all the MAC addresses from iptables
+my @i_macs;
+foreach (@f_rules, @n_rules, @r_rules) {
+   m/([0-9A-F]{2}:){5}([0-9A-F]{2})/;
+   my $mac = $&;
+   $mac =~ s/://g;
+   push (@i_macs,$mac);
+}
+
+# Filter for unique values
+my %seen;
+my @i_macs = grep {! $seen{$_}++ } @i_macs;
+
+# Get all unique MAC addresses from the rules table
+my $sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from rules
+                         inner join device on rules.user_id=device.user_id group by mac");
+$sth->execute();
+my $all = $sth->fetchall_arrayref();
+my @r_macs = map { $_->[0] } @$all;
 
 # Set up the bedtime, ground and reward arrays
 my @f_bt_ru_a;
@@ -40,6 +50,7 @@ foreach (grep(/ TIME from /, @f_rules)) {
    my $line   = $bobs[0];
    @bobs      = split(/\s*MAC\s*/,$bobs[1]);
    my $mac    = $bobs[1];
+   $mac       =~ s/://g;
    @bobs      = split(/\s*to\s*/,$bits[1]);
    my $start  = $bobs[0];
    @bobs      = split(/reject-with icmp-port-unreachable/,$bobs[1]);
@@ -81,19 +92,58 @@ foreach (@r_rules) {
    push (@f_rw_ru_a,{line=>$line, mac=>$mac});
 }
 
+# Get all the new rules from the database
+my @db_rule_a;
+my $sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac, night, morning, days
+                         from rules inner join device on rules.user_id=device.user_id");
+$sth->execute();
+while ($sth->fetchrow_array) {
+   my ($mac,$night,$morning,$days) = (@_);
+   push (@db_rule_a,{mac=>$mac, night=>$night, morning=>$morning, days=>$days});
+}
+
 # Set the string for iptables modifications
 my $tables = '';
+
+# Copy the MAC arrays to record removals
+my @i_macs_r = @i_macs;
+my @r_macs_r = @r_macs;
+
+# Check for matching MAC addresses
+foreach my $old (@i_macs) {
+   foreach my $new (@r_macs) {
+      if ($old eq $new) {
+         my (@old_rules,@new_rules);
+         foreach (@f_bt_ru_a) { push (@old_rules,$_) if ($_->{mac} eq $old); }
+         foreach (@db_rule_a) { push (@new_rules,$_) if ($_->{mac} eq $new); }
+         remove(\@i_macs_r,$old);
+         remove(\@r_macs_r,$new);
+      }
+   }
+}
+####
 
 # Look for bedtime rules with new times
 foreach my $old (@f_bt_ru_a) {
    foreach my $new (@$all) {
       my ($mac, $night, $morning, $days) = $new;
-      if (($mac eq $old->{mac}) && ($days eq $old->{days})) {
-         # Add a modify rule if there is a change
-         $tables .= "Gon swop $old->{night} to $night and $old->{morning} to $morning for $mac on $days\n"
-            unless (($night eq $old->{night}) && ($morning eq $old->{morning}));
-         # No need to continue with the inner loop
-         last;
+      # Calculate if the night time is before midnight
+      if (time2secs($night) < 86399) {
+         if (($mac eq $old->{mac}) && ($days eq $old->{days})) {
+            # Add a modify rule if there is a change
+            $tables .= "Gon swop $old->{night} to $night and $old->{morning} to $morning for $mac on $days\n"
+               unless (($night eq $old->{night}) && ($morning eq $old->{morning}));
+            # No need to continue with the inner loop
+            last;
+         }
+      } else {
+         if (($mac eq $old->{mac}) && ($days eq $old->{days})) {
+            # Add a modify rule if there is a change
+            $tables .= "Gon swop $old->{night} to $night and $old->{morning} to $morning for $mac on $days\n"
+               unless (($night eq $old->{night}) && ($morning eq $old->{morning}));
+            # No need to continue with the inner loop
+            last;
+         }
       }
    }
 }
@@ -116,7 +166,7 @@ my $tables = '';
 
 # Get all mac addresses with rules to create delete iptables commands
 $sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from rules inner join device on rules.user_id=device.user_id group by mac");
-$res = $sth->execute or die "Cannot execute query: $sth->errstr";
+my $res = $sth->execute or die "Cannot execute query: $sth->errstr";
 while (my @row = $sth->fetchrow_array()) {
    my $mac = join(":",($row[0] =~ m/../g));
    my @ipt = grep {$_ =~ /$mac/} @f_rules;
@@ -167,4 +217,15 @@ sub time2secs {
    my $secs = $bits[0] * 3600 + $bits[1] * 60 + $bits[2];
       $secs = $bits[0] * 3600 + $bits[1] * 60 if $#bits == 1;
    $secs;
+}
+
+# Remove a matching record from an array
+sub remove {
+   my ($ref, $val) = (@_);
+   my $i;
+   foreach (@$ref) {
+      last if ($_ eq $val);
+      $i++;
+   }
+   splice(@$ref,$i,1);
 }
