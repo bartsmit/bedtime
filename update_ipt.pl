@@ -4,6 +4,14 @@ use BedtimeDB qw(get_val);
 use DBI;
 use strict;
 
+my (@old_t,@new_t);
+push (@old_t,{line=>'1', mac=>'0055332211', start=>'02:00:00', finish=>'04:00:00', days=>'12'});
+push (@new_t,{mac=>'0055332211', night=>'01:00:00', morning=>'04:00:00', days=>'12'});
+
+my $tab_t = mod_rule(\@old_t,\@new_t);
+print "$tab_t\n";
+die "testoid 1,2,3\n";
+
 # Create array of days of the week
 my @weekdays = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
 
@@ -181,15 +189,22 @@ sub remove {
 # Create an iptables modify rule from an old and new array
 sub mod_rule {
    my ($old_ref,$new_ref) = (@_);
+   my @old = @$old_ref;
+   my @new = @$new_ref;
 
    # Return value for the iptables rule
    my $ipt;
 
    # If the old array has one rule then bedtime starts after midnight
-   if ($old_ref = 1) {
-      my $line = ${$old_ref}->{line};
-      $ipt = "iptables -R FORWARD $line";
+   if (scalar (@old) == 1) {
+      my $mac = join(':',( $old[0]->{mac} =~ m/../g ));
+      $ipt  = "iptables -R FORWARD $old[0]->{line} -m mac --mac-source $mac ";
+      $ipt .= "-m time --timestart $new[0]->{night} ";
+      $ipt .= "--timestop $new[0]->{morning} ";
    } else {
+#      my %rule = $old[0];
+#      my $line = %rule->{line};
+#      $ipt = "foo $line";
    }
    $ipt;
 }
