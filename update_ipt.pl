@@ -13,6 +13,9 @@ my $dbh = &BedtimeDB::dbconn;
 # Get my IP address
 my $myip = get_val('myip');
 
+# Get the weekend days mask
+my $weekend = get_val('weekend');
+
 # Get all the current reject, redirect nat rules and accept rules with a MAC filter
 my @f_rules = `iptables -L FORWARD --line-numbers | grep MAC | grep REJECT`;
 my @n_rules = `iptables -t nat -L PREROUTING --line-numbers | grep MAC | grep REDIRECT`;
@@ -69,7 +72,7 @@ foreach (grep(/ TIME from /, @f_rules)) {
       $finish = $bobs[0];
       $mask   = 0;
    }
-   push (@f_bt_ru_a,{line=>$line, mac=>$mac, start=>$start, finish=>$finish, bits=>$mask});
+   push (@f_bt_ru_a,{line=>$line, mac=>$mac, start=>$start, finish=>$finish, days=>$mask});
 }
 
 # Now the ground rules
@@ -97,8 +100,8 @@ my @db_rule_a;
 my $sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac, night, morning, days
                          from rules inner join device on rules.user_id=device.user_id");
 $sth->execute();
-while ($sth->fetchrow_array) {
-   my ($mac,$night,$morning,$days) = (@_);
+while (my @row = $sth->fetchrow_array) {
+   my ($mac,$night,$morning,$days) = (@row);
    push (@db_rule_a,{mac=>$mac, night=>$night, morning=>$morning, days=>$days});
 }
 
@@ -113,102 +116,83 @@ my @r_macs_r = @r_macs;
 foreach my $old (@i_macs) {
    foreach my $new (@r_macs) {
       if ($old eq $new) {
-         my (@old_rules,@new_rules);
-         foreach (@f_bt_ru_a) { push (@old_rules,$_) if ($_->{mac} eq $old); }
-         foreach (@db_rule_a) { push (@new_rules,$_) if ($_->{mac} eq $new); }
+
+         # If they match, get the old and new, weekend and school night rules
+         my (@old_we_rules,@old_sn_rules,@new_we_rules, @new_sn_rules);
+
+         # First the old rules from iptables
+         foreach (@f_bt_ru_a) { 
+            if ($_->{mac} eq $old) {
+               if ($_->{days} == $weekend) {
+                  push (@old_we_rules,$_);
+               } else {
+                  push (@old_sn_rules,$_);
+               }
+            }
+         }
+
+         # Then the new rules from the database
+         foreach (@db_rule_a) { 
+            if ($_->{mac} eq $new) {
+               if ($_->{days} == $weekend) {
+                  push (@new_we_rules,$_);
+               } else {
+                  push (@new_sn_rules,$_);
+               }
+            }
+         }
+
+         # Now create a modify rule from each set of old and new rules
+         $tables .= mod_rule(\@old_we_rules,\@new_we_rules);
+         $tables .= mod_rule(\@old_sn_rules,\@new_sn_rules); 
+
+         # Finally remove the mac from both old and new lists
          remove(\@i_macs_r,$old);
          remove(\@r_macs_r,$new);
+
+         # No need to check any other mac
+         last;
       }
    }
 }
 ####
-
-# Look for bedtime rules with new times
-foreach my $old (@f_bt_ru_a) {
-   foreach my $new (@$all) {
-      my ($mac, $night, $morning, $days) = $new;
-      # Calculate if the night time is before midnight
-      if (time2secs($night) < 86399) {
-         if (($mac eq $old->{mac}) && ($days eq $old->{days})) {
-            # Add a modify rule if there is a change
-            $tables .= "Gon swop $old->{night} to $night and $old->{morning} to $morning for $mac on $days\n"
-               unless (($night eq $old->{night}) && ($morning eq $old->{morning}));
-            # No need to continue with the inner loop
-            last;
-         }
-      } else {
-         if (($mac eq $old->{mac}) && ($days eq $old->{days})) {
-            # Add a modify rule if there is a change
-            $tables .= "Gon swop $old->{night} to $night and $old->{morning} to $morning for $mac on $days\n"
-               unless (($night eq $old->{night}) && ($morning eq $old->{morning}));
-            # No need to continue with the inner loop
-            last;
-         }
-      }
-   }
-}
-
-# Now all the new rules need to be added and old rules deleted
-
-print "$tables\n";
 die "that'll do\n";
 
-print "Bedtime rules\n";
-print "$_->{line} : $_->{mac} from $_->{start} to $_->{finish} on $_->{bits}\n" foreach(@f_bt_ru_a);
-print "Grounded rules\n";
-print "$_->{line} : $_->{mac}\n" foreach(@f_gr_ru_a);
-print "Reward rules\n";
-print "$_->{line} : $_->{mac}\n" foreach(@f_rw_ru_a);
-die "Done for now\n";
-
-# update iptables with rules in $tables
-my $tables = '';
-
-# Get all mac addresses with rules to create delete iptables commands
-$sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from rules inner join device on rules.user_id=device.user_id group by mac");
-my $res = $sth->execute or die "Cannot execute query: $sth->errstr";
-while (my @row = $sth->fetchrow_array()) {
-   my $mac = join(":",($row[0] =~ m/../g));
-   my @ipt = grep {$_ =~ /$mac/} @f_rules;
-   foreach (@ipt) {
-      m/^\d*/;
-      $tables .= "iptables -D FORWARD $1\n";
-   }
-   @ipt = grep {$_ =~ /$mac/} @n_rules;
-   foreach (@ipt) {
-      m/^\d*/;
-      $tables .= "iptables -t nat -D PREROUTING $1\n";
-   }
-
-}
-
-# Get all the rules to create insert iptables commands
-$sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac, morning, night, days from rules inner join device on rules.user_id=device.user_id order by mac");
-$res = $sth->execute or die "Cannot execute query: $sth->errstr";
-while (my @row = $sth->fetchrow_array()) {
-   my $mac    = lc(join(":",($row[0] =~ m/../g)));
-   my $start  = $row[1];
-   my $finish = $row[2];
-   my $days   = '';
-   for (my $i=0;$i<8;$i++) {
-      $days .= $weekdays[$i]."," if (($row[3] & (128 >> $i)) == (128 >> $i));
-   }
-   $days =~ s/,$//;
-   if ($start =~ m/^0/) {
-      $tables .= "iptables -I FORWARD -m mac --mac-source $mac -m time --timestart $start --timestop $finish --weekdays $days -j REJECT\n";
-      $tables .= "iptables -t nat -I PREROUTING -m mac --mac-source $mac -p tcp ! -d $myip -m time --timestamp $start --timestop $finish ";
-      $tables .= "--weekdays $days -m tcp --dport 80 -j REDIRECT --to-ports 3128\n";
-   } else {
-      $tables .= "iptables -I FORWARD -m mac --mac-source $mac -m time --timestart $start --timestop 23:59:59 --weekdays $days -j REJECT\n";
-      $tables .= "iptables -t nat -I PREROUTING -m mac --mac-source $mac -p tcp ! -d $myip -m time --timestart $start --timestop 23:59:59 ";
-      $tables .= "--weekdays $days -m tcp --dport 80 -j REDIRECT --to-ports 3128\n";
-      $tables .= "iptables -I FORWARD -m mac --mac-source $mac -m time --timestart 00:00:00 --timestop $finish --weekdays $days -j REJECT\n";
-      $tables .= "iptables -t nat -I PREROUTING -m mac --mac-source $mac -p tcp ! -d $myip -m time --timestart 00:00:00 --timestop $finish ";
-      $tables .= "--weekdays $days -m tcp --dport 80 -j REDIRECT --to-ports 3128\n";
-   }
-}
 print $tables;
 #exec($tables);
+
+### Subroutines ###
+
+# Remove a matching record from an array
+sub remove {
+   my ($ref, $val) = (@_);
+
+   # Get the index of the record
+   my $i;
+   foreach (@$ref) {
+      last if ($_ eq $val);
+      $i++;
+   }
+
+   # Splice out that record
+   splice(@$ref,$i,1);
+}
+
+# Create an iptables modify rule from an old and new array
+sub mod_rule {
+   my ($old_ref,$new_ref) = (@_);
+
+   # Return value for the iptables rule
+   my $ipt;
+
+   # If the old array has one rule then bedtime starts after midnight
+   if ($old_ref = 1) {
+      my $line = ${$old_ref}->{line};
+      $ipt = "iptables -R FORWARD $line";
+   } else {
+   }
+   $ipt;
+}
 
 # Find the number of seconds since midnight of a time in hh:mm:ss
 sub time2secs {
@@ -219,13 +203,3 @@ sub time2secs {
    $secs;
 }
 
-# Remove a matching record from an array
-sub remove {
-   my ($ref, $val) = (@_);
-   my $i;
-   foreach (@$ref) {
-      last if ($_ eq $val);
-      $i++;
-   }
-   splice(@$ref,$i,1);
-}
