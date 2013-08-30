@@ -4,16 +4,18 @@ use BedtimeDB qw(get_val);
 use DBI;
 use strict;
 
-my (@old_t,@new_t);
-push (@old_t,{line=>'1', mac=>'0055332211', start=>'02:00:00', finish=>'04:00:00', days=>'12'});
-push (@new_t,{mac=>'0055332211', night=>'01:00:00', morning=>'04:00:00', days=>'12'});
-
-my $tab_t = mod_rule(\@old_t,\@new_t);
-print "$tab_t\n";
-die "testoid 1,2,3\n";
-
 # Create array of days of the week
 my @weekdays = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
+
+my (@old_t,@new_t);
+push (@old_t,{line=>'1', mac=>'0055AA2211', start=>'02:00:00', finish=>'04:00:00', days=>'12'});
+push (@new_t,{mac=>'0055AA2211', night=>'01:00:00', morning=>'04:00:00', days=>'12'});
+
+my $tab_t = mod_rule(\@old_t,\@new_t,'FORWARD');
+#print mask2days(12);
+print "\n$tab_t\n";
+
+die "done\n";
 
 # Connect to the database
 my $dbh = &BedtimeDB::dbconn;
@@ -186,27 +188,87 @@ sub remove {
    splice(@$ref,$i,1);
 }
 
-# Create an iptables modify rule from an old and new array
+# Create iptables rules from an old and new array
 sub mod_rule {
-   my ($old_ref,$new_ref) = (@_);
+   my ($old_ref,$new_ref,$table) = (@_);
    my @old = @$old_ref;
    my @new = @$new_ref;
 
-   # Return value for the iptables rule
-   my $ipt;
+   # Return value for the iptables rule(s)
+   my $ipt = '';
+
+   # Add separators to the MAC and set it lowercase
+   my $mac = join(':',( lc($old[0]->{mac}) =~ m/../g ));
+
+   # If the bedtime straddles midnight, we'll need two new rules
+   my $straddle = (time2secs($new[0]->{night}) < 43200) ? 1 : 0;
+
+   # There are at least one each of  new and old rules. Check if they're the same
+   if (($old[0]->{night}   eq $new[0]->{start}) &&
+       ($old[0]->{days}    == $new[0]->{days})  &&
+      (($old[0]->{morning} eq $new[0]->{finish}) || ($straddle))) {
+      # MAC is already the same, so nothing to do here
+   } else {
+      $ipt .= "iptables -R $table $old[0]->{line} -m mac --mac-source $mac ";
+
+      # If there are two new rules, start with the early one
+      my $finish = ($straddle == 1) ? '23:59:59' : $new[0]->{morning};
+      $ipt .= "-m time --timestart $new[0]->{start} --timestop $finish ";
+      my $mask = $new[0]->{days};
+      $mask = $mask >> 1 if ($straddle);
+      $ipt .= "--weekdays " . mask2days($mask) if $mask;
+      my $action = ($table eq 'FORWARD') ? " -j REJECT" : " -m tcp --dport 80 -j REDIRECT --to-ports 3128";
+      $ipt .= $action;
+   }
+
+   # Do we need a second rule?
+   if ($straddle) {
+      # Is there a second old rule to replace?
+      if (scalar(@old) == 1){
+      } else {
+         # Create an add rule
+      }
+   } else {
+      # Is there a second old rule to delete?
+      if (scalar(@old) == 1) {
+         # Delete the second old rule
+      }
+   }
+
+
+   # Shift one day forward if the new start is midnight to noon
+   my $mask = $new[0]->{days};
+   $mask = $mask >> 1 if (time2secs($new[0]->{night}) < 43200);
+
+   # Add the days modifier if there is a mask
+   $ipt .= "--weekdays " . mask2days($mask) if $mask;
 
    # If the old array has one rule then bedtime starts after midnight
    if (scalar (@old) == 1) {
-      my $mac = join(':',( $old[0]->{mac} =~ m/../g ));
-      $ipt  = "iptables -R FORWARD $old[0]->{line} -m mac --mac-source $mac ";
+      $ipt  = "iptables -R $table $old[0]->{line} -m mac --mac-source $mac ";
       $ipt .= "-m time --timestart $new[0]->{night} ";
       $ipt .= "--timestop $new[0]->{morning} ";
+
+      # If we're after midnight, night time is tomorrow
+      my $mask = $new[0]->{days} >> 1;
+      $ipt .= " --weekdays " . mask2days($mask);
+      my $action = ($table eq 'FORWARD') ? " -j REJECT" : " -m tcp --dport 80 -j REDIRECT --to-ports 3128";
+      $ipt .= $action;
    } else {
-#      my %rule = $old[0];
-#      my $line = %rule->{line};
-#      $ipt = "foo $line";
+
+      # Create two replace rules
+      for (my $i=0;$i=1;$i++) {
+         $ipt .= "iptables -R $table $old[$i]->{line} -m mac --mac-source $mac ";
+         $ipt .= "-m time --timestart ";
+      }
    }
+
    $ipt;
+}
+
+# Create a time modifier from old and new times
+sub times2mod {
+   
 }
 
 # Find the number of seconds since midnight of a time in hh:mm:ss
@@ -218,3 +280,20 @@ sub time2secs {
    $secs;
 }
 
+# Convert a days mask to iptables modifier string
+sub mask2days {
+   my $mask = shift;
+   my $days;
+
+   # If the '8th' weekday is set then move its flag to the beginning
+   $mask = ($mask & 254) | 128 if ($mask & 1);
+
+   # Add a weekday and comma for each bit set
+   for (my $i=0;$i<8;$i++) {
+      $days .= "$weekdays[$i]," if ($mask & (128 >> $i));
+   }
+
+   # Remove the trailing comma
+   $days =~ s/,$//;
+   $days;
+}
