@@ -194,6 +194,9 @@ sub mod_rule {
    my @old = @$old_ref;
    my @new = @$new_ref;
 
+   # Set the action according to the table
+   my $action = ($table eq 'FORWARD') ? " -j REJECT\n" : " -m tcp --dport 80 -j REDIRECT --to-ports 3128\n";
+
    # Return value for the iptables rule(s)
    my $ipt = '';
 
@@ -217,52 +220,42 @@ sub mod_rule {
       my $mask = $new[0]->{days};
       $mask = $mask >> 1 if ($straddle);
       $ipt .= "--weekdays " . mask2days($mask) if $mask;
-      my $action = ($table eq 'FORWARD') ? " -j REJECT" : " -m tcp --dport 80 -j REDIRECT --to-ports 3128";
       $ipt .= $action;
    }
 
    # Do we need a second rule?
    if ($straddle) {
+      # Set days one day later
+      my $mask = $new[0]->{days} >> 1;
+
       # Is there a second old rule to replace?
       if (scalar(@old) == 1){
+         # Check if we need a second replace rule
+         if (($old[1]->{morning} eq $new[0]->{finish}) &&
+             ($old[1]->{days}    == $new[0]->{days})) {
+            # Second rules are the same, no replace needed
+         } else {
+            $ipt .= "iptables -R $table $old[1]->{line} -m mac --mac-source $mac ";
+
+            # Second rule is the late one
+            $ipt .= "-m time --timestart 00:00:00 --timestop $new[0]->{finish} ";
+            $ipt .= "--weekdays " . mask2days($mask) if $mask;
+            $ipt .= $action;
+         }
       } else {
          # Create an add rule
+         $ipt .= "iptables -I $table $old[1]->{line} -m mac --mac-source $mac ";
+         $ipt .= "-m time --timestart 00:00:00 --timestop $new[0]->{finish} ";
+         $ipt .= "--weekdays " . mask2days($mask) if $mask;
+         $ipt .= $action;
       }
    } else {
       # Is there a second old rule to delete?
       if (scalar(@old) == 1) {
          # Delete the second old rule
+         $ipt .= "iptables -D $table $old[1]->{line}\n";
       }
    }
-
-
-   # Shift one day forward if the new start is midnight to noon
-   my $mask = $new[0]->{days};
-   $mask = $mask >> 1 if (time2secs($new[0]->{night}) < 43200);
-
-   # Add the days modifier if there is a mask
-   $ipt .= "--weekdays " . mask2days($mask) if $mask;
-
-   # If the old array has one rule then bedtime starts after midnight
-   if (scalar (@old) == 1) {
-      $ipt  = "iptables -R $table $old[0]->{line} -m mac --mac-source $mac ";
-      $ipt .= "-m time --timestart $new[0]->{night} ";
-      $ipt .= "--timestop $new[0]->{morning} ";
-
-      # If we're after midnight, night time is tomorrow
-      my $mask = $new[0]->{days} >> 1;
-      $ipt .= " --weekdays " . mask2days($mask);
-      my $action = ($table eq 'FORWARD') ? " -j REJECT" : " -m tcp --dport 80 -j REDIRECT --to-ports 3128";
-      $ipt .= $action;
-   } else {
-
-      # Create two replace rules
-      for (my $i=0;$i=1;$i++) {
-         $ipt .= "iptables -R $table $old[$i]->{line} -m mac --mac-source $mac ";
-         $ipt .= "-m time --timestart ";
-      }
-   }
-
    $ipt;
 }
 
