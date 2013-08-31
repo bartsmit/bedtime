@@ -8,12 +8,13 @@ use strict;
 my @weekdays = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
 
 my (@old_t,@new_t);
-push (@old_t,{line=>'1', mac=>'0055AA2211', start=>'02:00:00', finish=>'04:00:00', days=>'12'});
-push (@new_t,{mac=>'0055AA2211', night=>'01:00:00', morning=>'04:00:00', days=>'12'});
+push (@old_t,{line=>'1', mac=>'0055AA2211', start=>'23:00:00', finish=>'23:59:59', days=>'12'});
+push (@old_t,{line=>'2', mac=>'0055AA2211', start=>'00:00:00', finish=>'06:00:00', days=>'6'});
+push (@new_t,{mac=>'0055AA2211', night=>'20:30:00', morning=>'04:30:00', days=>'12'});
 
 my $tab_t = mod_rule(\@old_t,\@new_t,'FORWARD');
-#print mask2days(12);
-print "\n$tab_t\n";
+
+print "$tab_t\n";
 
 die "done\n";
 
@@ -204,21 +205,21 @@ sub mod_rule {
    my $mac = join(':',( lc($old[0]->{mac}) =~ m/../g ));
 
    # If the bedtime straddles midnight, we'll need two new rules
-   my $straddle = (time2secs($new[0]->{night}) < 43200) ? 1 : 0;
-
+   my $straddle = (time2secs($new[0]->{night}) > 43200) ? 1 : 0;
    # There are at least one each of  new and old rules. Check if they're the same
-   if (($old[0]->{night}   eq $new[0]->{start}) &&
+   if (($old[0]->{start}   eq $new[0]->{night}) &&
        ($old[0]->{days}    == $new[0]->{days})  &&
-      (($old[0]->{morning} eq $new[0]->{finish}) || ($straddle))) {
+      (($old[0]->{finish} eq $new[0]->{morning}) || ($straddle))) {
       # MAC is already the same, so nothing to do here
    } else {
       $ipt .= "iptables -R $table $old[0]->{line} -m mac --mac-source $mac ";
 
       # If there are two new rules, start with the early one
-      my $finish = ($straddle == 1) ? '23:59:59' : $new[0]->{morning};
-      $ipt .= "-m time --timestart $new[0]->{start} --timestop $finish ";
+      my $finish = $straddle ? '23:59:59' : $new[0]->{morning};
+
+      $ipt .= "-m time --timestart $new[0]->{night} --timestop $finish ";
       my $mask = $new[0]->{days};
-      $mask = $mask >> 1 if ($straddle);
+      $mask = $mask >> 1 if (time2secs($new[0]->{night}) < 43200);
       $ipt .= "--weekdays " . mask2days($mask) if $mask;
       $ipt .= $action;
    }
@@ -229,29 +230,29 @@ sub mod_rule {
       my $mask = $new[0]->{days} >> 1;
 
       # Is there a second old rule to replace?
-      if (scalar(@old) == 1){
+      if (scalar(@old) == 2){
          # Check if we need a second replace rule
-         if (($old[1]->{morning} eq $new[0]->{finish}) &&
-             ($old[1]->{days}    == $new[0]->{days})) {
+         if (($old[1]->{finish} eq $new[0]->{morning}) &&
+             ($old[1]->{days}   == $new[0]->{days})) {
             # Second rules are the same, no replace needed
          } else {
             $ipt .= "iptables -R $table $old[1]->{line} -m mac --mac-source $mac ";
-
             # Second rule is the late one
-            $ipt .= "-m time --timestart 00:00:00 --timestop $new[0]->{finish} ";
+            $ipt .= "-m time --timestart 00:00:00 --timestop $new[0]->{morning} ";
             $ipt .= "--weekdays " . mask2days($mask) if $mask;
             $ipt .= $action;
          }
       } else {
-         # Create an add rule
-         $ipt .= "iptables -I $table $old[1]->{line} -m mac --mac-source $mac ";
-         $ipt .= "-m time --timestart 00:00:00 --timestop $new[0]->{finish} ";
+         # Create an add rule after the first
+         my $line = $old[0]->{line} + 1;
+         $ipt .= "iptables -I $table $line -m mac --mac-source $mac ";
+         $ipt .= "-m time --timestart 00:00:00 --timestop $new[0]->{morning} ";
          $ipt .= "--weekdays " . mask2days($mask) if $mask;
          $ipt .= $action;
       }
    } else {
       # Is there a second old rule to delete?
-      if (scalar(@old) == 1) {
+      if (scalar(@old) == 2) {
          # Delete the second old rule
          $ipt .= "iptables -D $table $old[1]->{line}\n";
       }
