@@ -7,17 +7,6 @@ use strict;
 # Create array of days of the week
 my @weekdays = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
 
-my (@old_t,@new_t);
-push (@old_t,{line=>'1', mac=>'0055AA2211', start=>'23:00:00', finish=>'23:59:59', days=>'12'});
-push (@old_t,{line=>'2', mac=>'0055AA2211', start=>'00:00:00', finish=>'06:00:00', days=>'6'});
-push (@new_t,{mac=>'0055AA2211', night=>'20:30:00', morning=>'04:30:00', days=>'12'});
-
-my $tab_t = mod_rule(\@old_t,\@new_t,'FORWARD');
-
-print "$tab_t\n";
-
-die "done\n";
-
 # Connect to the database
 my $dbh = &BedtimeDB::dbconn;
 
@@ -58,33 +47,7 @@ my @f_gr_ru_a;
 my @f_rw_ru_a;
 
 # Process the bedtime rules
-foreach (grep(/ TIME from /, @f_rules)) {
-   my @bits   = split(/ TIME from /);
-   my @bobs   = split(/\s*REJECT\s*/,$bits[0]);
-   my $line   = $bobs[0];
-   @bobs      = split(/\s*MAC\s*/,$bobs[1]);
-   my $mac    = $bobs[1];
-   $mac       =~ s/://g;
-   @bobs      = split(/\s*to\s*/,$bits[1]);
-   my $start  = $bobs[0];
-   @bobs      = split(/reject-with icmp-port-unreachable/,$bobs[1]);
-   my $finish = '';
-   my $days   = '';
-   my $mask   = 0;
-   if ($bobs[0] =~ /\s+on\s+/) {
-       @bobs = split(/\s+on\s+/,$bobs[0]);
-       $finish = $bobs[0];
-       $days = $bobs[1];
-       for (my $i=0;$i<8;$i++) {
-          my $try = $weekdays[$i];
-          $mask = $mask | (128 >> $i) if ($days =~ /$try/);
-       }
-   } else {
-      $finish = $bobs[0];
-      $mask   = 0;
-   }
-   push (@f_bt_ru_a,{line=>$line, mac=>$mac, start=>$start, finish=>$finish, days=>$mask});
-}
+procfw(/@f_rules,/@f_bt_ru_a);
 
 # Now the ground rules
 foreach (grep (!/ TIME from /, @f_rules)) {
@@ -154,8 +117,10 @@ foreach my $old (@i_macs) {
          }
 
          # Now create a modify rule from each set of old and new rules
-         $tables .= mod_rule(\@old_we_rules,\@new_we_rules);
-         $tables .= mod_rule(\@old_sn_rules,\@new_sn_rules); 
+         $tables .= mod_rule(\@old_we_rules,\@new_we_rules,'FORWARD');
+         $tables .= mod_rule(\@old_sn_rules,\@new_sn_rules,'FORWARD'); 
+         $tables .= mod_rule(\@old_we_rules,\@new_we_rules,'PREROUTING');
+         $tables .= mod_rule(\@old_sn_rules,\@new_sn_rules,'PREROUTING');
 
          # Finally remove the mac from both old and new lists
          remove(\@i_macs_r,$old);
@@ -166,13 +131,65 @@ foreach my $old (@i_macs) {
       }
    }
 }
-####
-die "that'll do\n";
 
+# Apply the modify rules as they may change the line numbers
+#exec($tables);
+$tables = '';
+
+# If there are old mac rules, delete them
+unless (scalar(@r_macs)) {
+   my @lines;
+   # Refresh the arrays with the new rule order
+   @f_rules = `iptables -L FORWARD --line-numbers | grep MAC | grep REJECT`;
+   @n_rules = `iptables -t nat -L PREROUTING --line-numbers | grep MAC | grep REDIRECT`;
+   procfw(/@f_rules,/@f_bt_ru_a);
+   foreach (@r_macs) {
+      my $mac = $_;
+      foreach (@f_bt_ru_a) {
+         push (@lines, $_->{line} if ($mac eq $_->{mac};
+      }
+   }
+   foreach (sort(@lines);
+}
+
+# Create add rules for the remaining new rules mac addresses
+foreach (@r_macs) {
+   my $newmac = $_;
+   foreach (@db_rule_a) {
+      
+   }
+}
+
+print "MACs from iptables\n";
+print "$_\n" foreach(@i_macs);
+print "MACs from database\n";
+print "$_\n" foreach(@r_macs);
 print $tables;
 #exec($tables);
 
 ### Subroutines ###
+
+# Process the forward rules
+sub procfw {
+   my ($in,$out,$first) = (@_);
+   foreach (grep(/ TIME from /, @$in)) {
+      my $line   = $& if (m/^\d*/);
+      my $mac    = $& if (m/MAC ([0-9A-F]{2}:){5}([0-9A-F]{2})/);
+      my $start  = $& if (m/from (([0-2][0-9])(:[0-5][0-9]){2})/);
+      my $finish = $& if (m/to (([0-2][0-9])(:[0-5][0-9]){2})/);
+      if (m/on ([A-Za-z]{3},)+[A-Za-z]/) {
+         $days =~ s/^on //;
+         my $mask   = 0;
+         for (my $i=0;$i<8;$i++) {
+            my $try = $weekdays[$i];
+            $mask = $mask | (128 >> $i) if ($days =~ /$try/);
+         }
+      } else {
+         $mask   = 0;
+      }
+      push (@$out,{line=>$line, mac=>$mac, start=>$start, finish=>$finish, days=>$mask});
+   }
+}
 
 # Remove a matching record from an array
 sub remove {
