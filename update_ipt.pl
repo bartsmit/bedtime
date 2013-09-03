@@ -47,7 +47,7 @@ my @f_gr_ru_a;
 my @f_rw_ru_a;
 
 # Process the bedtime rules
-procfw(/@f_rules,/@f_bt_ru_a);
+procrule(\@f_rules,\@f_bt_ru_a);
 
 # Now the ground rules
 foreach (grep (!/ TIME from /, @f_rules)) {
@@ -90,10 +90,8 @@ my @r_macs_r = @r_macs;
 foreach my $old (@i_macs) {
    foreach my $new (@r_macs) {
       if ($old eq $new) {
-
          # If they match, get the old and new, weekend and school night rules
          my (@old_we_rules,@old_sn_rules,@new_we_rules, @new_sn_rules);
-
          # First the old rules from iptables
          foreach (@f_bt_ru_a) { 
             if ($_->{mac} eq $old) {
@@ -104,7 +102,6 @@ foreach my $old (@i_macs) {
                }
             }
          }
-
          # Then the new rules from the database
          foreach (@db_rule_a) { 
             if ($_->{mac} eq $new) {
@@ -115,78 +112,114 @@ foreach my $old (@i_macs) {
                }
             }
          }
-
          # Now create a modify rule from each set of old and new rules
          $tables .= mod_rule(\@old_we_rules,\@new_we_rules,'FORWARD');
          $tables .= mod_rule(\@old_sn_rules,\@new_sn_rules,'FORWARD'); 
          $tables .= mod_rule(\@old_we_rules,\@new_we_rules,'PREROUTING');
          $tables .= mod_rule(\@old_sn_rules,\@new_sn_rules,'PREROUTING');
-
          # Finally remove the mac from both old and new lists
          remove(\@i_macs_r,$old);
          remove(\@r_macs_r,$new);
-
          # No need to check any other mac
          last;
       }
    }
 }
 
-# Apply the modify rules as they may change the line numbers
+# Apply the replace iptables as they may change the line numbers
+print $tables . "\n";
 #exec($tables);
 $tables = '';
 
-# If there are old mac rules, delete them
-unless (scalar(@r_macs)) {
-   my @lines;
+# If there are old mac iptables, delete them
+unless (scalar(@i_macs)) {
+   my @lines = ();
    # Refresh the arrays with the new rule order
    @f_rules = `iptables -L FORWARD --line-numbers | grep MAC | grep REJECT`;
    @n_rules = `iptables -t nat -L PREROUTING --line-numbers | grep MAC | grep REDIRECT`;
-   procfw(/@f_rules,/@f_bt_ru_a);
-   foreach (@r_macs) {
-      my $mac = $_;
+   procrule(\@f_rules,\@f_bt_ru_a);
+   foreach my $mac (@i_macs) {
       foreach (@f_bt_ru_a) {
-         push (@lines, $_->{line} if ($mac eq $_->{mac};
+         push (@lines, $_->{line}) if ($mac eq $_->{mac});
       }
    }
-   foreach (sort(@lines);
+   $tables .= "iptables FORWARD -D $_->{line}\n" foreach (sort(@lines));
 }
+print $tables . "\n";
+#exec($tables);
+$tables = '';
+
+# Keep tally for the rulesets per mac. Each needs two
+#my %tally;
+#$tally{$_} = 2 foreach(@r_macs);
 
 # Create add rules for the remaining new rules mac addresses
-foreach (@r_macs) {
-   my $newmac = $_;
+foreach my $newmac (@r_macs) {
    foreach (@db_rule_a) {
-      
+      if ($newmac eq $_->{mac}) {
+print "new mac is $newmac\n";
+         my $mac = join(':',( lc($newmac) =~ m/../g ));
+         my $todays = mask2days($_->{days});
+         my $tomorrows = mask2days($_->{days} >> 1);
+         my $start  = $_->{night};
+         my $finish = $_->{morning};
+         # Find out if we're straddling midnight
+         if (time2secs($_->{night}) > 43200) {
+            $tables .= "iptables -I FORWARD 1 -m mac --mac-source $mac -m time --timestart 00:00:00 "; 
+            $tables .= "--timestop $finish --weekdays $tomorrows -j REJECT\n";
+            $tables .= "iptables -I FORWARD 1 -m mac --mac-source $mac -m time --timestart $start ";
+            $tables .= "--timestop 23:59:59 --weekdays $todays -j REJECT\n";
+            $tables .= "iptables -t nat -I PREROUTING 1 -m mac --mac-source $mac -p tcp ! -d $myip ";
+            $tables .= "-m time --timestart 00:00:00 --timestop $finish --weekdays $tomorrows -m tcp ";
+            $tables .= "--dport 80 -j REDIRECT --to-ports 3128\n";
+            $tables .= "iptables -t nat -I PREROUTING 1 -m mac --mac-source $mac -p tcp ! -d $myip ";
+            $tables .= "-m time --timestart $start --timestop 23:59:59 --weekdays $todays -m tcp ";
+            $tables .= "--dport 80 -j REDIRECT --to-ports 3128\n";
+         } else {
+            $tables .= "iptables -I FORWARD 1 -m mac --mac-source $mac -m time --timestart $start ";
+            $tables .= "--timestop $finish --weekdays $tomorrows -j REJECT\n";
+            $tables .= "iptables -t nat -I PREROUTING 1 -m mac --mac-source $mac -p tcp ! -d $myip ";
+            $tables .= "-m time --timestart $start --timestop $finish --weekdays $tomorrows -m tcp ";
+            $tables .= "--dport 80 -j REDIRECT --to-ports 3128\n";
+         }
+         last;
+      }
    }
 }
-
+print $tables . "\n";
+#exec($tables);
+die "done\n";
 print "MACs from iptables\n";
 print "$_\n" foreach(@i_macs);
 print "MACs from database\n";
 print "$_\n" foreach(@r_macs);
-print $tables;
+#print $tables;
 #exec($tables);
 
 ### Subroutines ###
 
-# Process the forward rules
-sub procfw {
-   my ($in,$out,$first) = (@_);
+# Process an array of time rules
+sub procrule {
+   my ($in,$out) = (@_);
    foreach (grep(/ TIME from /, @$in)) {
+      # Match each part of the iptables output
       my $line   = $& if (m/^\d*/);
       my $mac    = $& if (m/MAC ([0-9A-F]{2}:){5}([0-9A-F]{2})/);
       my $start  = $& if (m/from (([0-2][0-9])(:[0-5][0-9]){2})/);
       my $finish = $& if (m/to (([0-2][0-9])(:[0-5][0-9]){2})/);
-      if (m/on ([A-Za-z]{3},)+[A-Za-z]/) {
+      my $mask = 0;
+      # See if there are weekdays restrictions
+      if (m/on ([a-zA-Z]{3})(,[a-zA-Z]{3})+/) {
+         my $days = $&;
          $days =~ s/^on //;
-         my $mask   = 0;
          for (my $i=0;$i<8;$i++) {
             my $try = $weekdays[$i];
             $mask = $mask | (128 >> $i) if ($days =~ /$try/);
          }
-      } else {
-         $mask   = 0;
       }
+      $mac    =~ s/MAC //;
+      $start  =~ s/from //;
+      $finish =~ s/to //;
       push (@$out,{line=>$line, mac=>$mac, start=>$start, finish=>$finish, days=>$mask});
    }
 }
