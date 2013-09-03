@@ -2,6 +2,7 @@
 
 use BedtimeDB qw(get_val);
 use DBI;
+use Data::Dump qw(dump);
 use strict;
 
 # Create array of days of the week
@@ -43,6 +44,7 @@ my @r_macs = map { $_->[0] } @$all;
 
 # Set up the bedtime, ground and reward arrays
 my @f_bt_ru_a;
+my @n_bt_ru_a;
 my @f_gr_ru_a;
 my @f_rw_ru_a;
 
@@ -95,7 +97,7 @@ foreach my $old (@i_macs) {
          # First the old rules from iptables
          foreach (@f_bt_ru_a) { 
             if ($_->{mac} eq $old) {
-               if ($_->{days} == $weekend) {
+               if (in_we($_->{days})) {
                   push (@old_we_rules,$_);
                } else {
                   push (@old_sn_rules,$_);
@@ -104,8 +106,8 @@ foreach my $old (@i_macs) {
          }
          # Then the new rules from the database
          foreach (@db_rule_a) { 
-            if ($_->{mac} eq $new) {
-               if ($_->{days} == $weekend) {
+            if ($_->{mac} eq $old) {
+               if (in_we($_->{days})) {
                   push (@new_we_rules,$_);
                } else {
                   push (@new_sn_rules,$_);
@@ -125,12 +127,11 @@ foreach my $old (@i_macs) {
       }
    }
 }
-
 # Apply the replace iptables as they may change the line numbers
-print $tables . "\n";
-#exec($tables);
+#print "$tables\n";
+exec($tables);
 $tables = '';
-
+#die;
 # If there are old mac iptables, delete them
 unless (scalar(@i_macs)) {
    my @lines = ();
@@ -143,7 +144,14 @@ unless (scalar(@i_macs)) {
          push (@lines, $_->{line}) if ($mac eq $_->{mac});
       }
    }
-   $tables .= "iptables FORWARD -D $_->{line}\n" foreach (sort(@lines));
+   $tables .= "iptables FORWARD -D $_->{line}\n" foreach (reverse sort(@lines));
+   procrule(\@n_rules,\@n_bt_ru_a);
+   foreach my $mac (@i_macs) {
+      foreach (@n_bt_ru_a) {
+         push (@lines, $_->{line}) if ($mac eq $_->{mac});
+      }
+   }
+   $tables .= "iptables -t nat PREROUTING -D $_->{line}\n" foreach (reverse sort(@lines));
 }
 print $tables . "\n";
 #exec($tables);
@@ -157,14 +165,13 @@ $tables = '';
 foreach my $newmac (@r_macs) {
    foreach (@db_rule_a) {
       if ($newmac eq $_->{mac}) {
-print "new mac is $newmac\n";
          my $mac = join(':',( lc($newmac) =~ m/../g ));
          my $todays = mask2days($_->{days});
          my $tomorrows = mask2days($_->{days} >> 1);
          my $start  = $_->{night};
          my $finish = $_->{morning};
          # Find out if we're straddling midnight
-         if (time2secs($_->{night}) > 43200) {
+         if (time2secs($start) > 43200) {
             $tables .= "iptables -I FORWARD 1 -m mac --mac-source $mac -m time --timestart 00:00:00 "; 
             $tables .= "--timestop $finish --weekdays $tomorrows -j REJECT\n";
             $tables .= "iptables -I FORWARD 1 -m mac --mac-source $mac -m time --timestart $start ";
@@ -182,13 +189,12 @@ print "new mac is $newmac\n";
             $tables .= "-m time --timestart $start --timestop $finish --weekdays $tomorrows -m tcp ";
             $tables .= "--dport 80 -j REDIRECT --to-ports 3128\n";
          }
-         last;
       }
    }
 }
-print $tables . "\n";
+#print $tables . "\n";
 #exec($tables);
-die "done\n";
+#die "done\n";
 print "MACs from iptables\n";
 print "$_\n" foreach(@i_macs);
 print "MACs from database\n";
@@ -217,7 +223,7 @@ sub procrule {
             $mask = $mask | (128 >> $i) if ($days =~ /$try/);
          }
       }
-      $mac    =~ s/MAC //;
+      $mac    =~ s/MAC |://g;
       $start  =~ s/from //;
       $finish =~ s/to //;
       push (@$out,{line=>$line, mac=>$mac, start=>$start, finish=>$finish, days=>$mask});
@@ -241,12 +247,13 @@ sub remove {
 
 # Create iptables rules from an old and new array
 sub mod_rule {
-   my ($old_ref,$new_ref,$table) = (@_);
+   my ($old_ref,$new_ref,$chain) = (@_);
    my @old = @$old_ref;
    my @new = @$new_ref;
 
    # Set the action according to the table
-   my $action = ($table eq 'FORWARD') ? " -j REJECT\n" : " -m tcp --dport 80 -j REDIRECT --to-ports 3128\n";
+   my $action = ($chain eq 'FORWARD') ? " -j REJECT\n" : " -p tcp --dport 80 -j REDIRECT --to-ports 3128\n";
+   my $prefix = ($chain eq 'FORWARD') ? "iptables" : "iptables -t nat";
 
    # Return value for the iptables rule(s)
    my $ipt = '';
@@ -256,13 +263,13 @@ sub mod_rule {
 
    # If the bedtime straddles midnight, we'll need two new rules
    my $straddle = (time2secs($new[0]->{night}) > 43200) ? 1 : 0;
-   # There are at least one each of  new and old rules. Check if they're the same
-   if (($old[0]->{start}   eq $new[0]->{night}) &&
-       ($old[0]->{days}    == $new[0]->{days})  &&
+   # There are at least one each of new and old rules. Check if they're the same
+   if (($old[0]->{start} eq $new[0]->{night}) &&
+       (in_we($old[0]->{days}) == in_we($new[0]->{days}))  &&
       (($old[0]->{finish} eq $new[0]->{morning}) || ($straddle))) {
-      # MAC is already the same, so nothing to do here
+      # rules are  already the same, so nothing to do here
    } else {
-      $ipt .= "iptables -R $table $old[0]->{line} -m mac --mac-source $mac ";
+      $ipt .= "$prefix -R $chain $old[0]->{line} -m mac --mac-source $mac ";
 
       # If there are two new rules, start with the early one
       my $finish = $straddle ? '23:59:59' : $new[0]->{morning};
@@ -283,10 +290,10 @@ sub mod_rule {
       if (scalar(@old) == 2){
          # Check if we need a second replace rule
          if (($old[1]->{finish} eq $new[0]->{morning}) &&
-             ($old[1]->{days}   == $new[0]->{days})) {
+             (in_we($old[1]->{days}) == in_we($new[0]->{days}))) {
             # Second rules are the same, no replace needed
          } else {
-            $ipt .= "iptables -R $table $old[1]->{line} -m mac --mac-source $mac ";
+            $ipt .= "$prefix -R $chain $old[1]->{line} -m mac --mac-source $mac ";
             # Second rule is the late one
             $ipt .= "-m time --timestart 00:00:00 --timestop $new[0]->{morning} ";
             $ipt .= "--weekdays " . mask2days($mask) if $mask;
@@ -295,7 +302,7 @@ sub mod_rule {
       } else {
          # Create an add rule after the first
          my $line = $old[0]->{line} + 1;
-         $ipt .= "iptables -I $table $line -m mac --mac-source $mac ";
+         $ipt .= "$prefix -I $chain $line -m mac --mac-source $mac ";
          $ipt .= "-m time --timestart 00:00:00 --timestop $new[0]->{morning} ";
          $ipt .= "--weekdays " . mask2days($mask) if $mask;
          $ipt .= $action;
@@ -304,7 +311,7 @@ sub mod_rule {
       # Is there a second old rule to delete?
       if (scalar(@old) == 2) {
          # Delete the second old rule
-         $ipt .= "iptables -D $table $old[1]->{line}\n";
+         $ipt .= "$prefix -D $chain $old[1]->{line}\n";
       }
    }
    $ipt;
@@ -340,4 +347,11 @@ sub mask2days {
    # Remove the trailing comma
    $days =~ s/,$//;
    $days;
+}
+
+# Check if a days mask is in the weekend
+sub in_we {
+   my $mask = shift;
+   my %we = map { $_ => 1 } ($weekend, $weekend >> 1);
+   exists($we{$mask});
 }
