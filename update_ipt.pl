@@ -5,9 +5,6 @@ use DBI;
 use Data::Dump qw(dump);
 use strict;
 
-# Create array of days of the week
-my @weekdays = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
-
 # Connect to the database
 my $dbh = &BedtimeDB::dbconn;
 
@@ -16,6 +13,9 @@ my $myip = get_val('myip');
 
 # Get the weekend days mask
 my $weekend = get_val('weekend');
+
+# Create array of days of the week
+my @weekdays = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
 
 # Get all the current reject, redirect nat rules and accept rules with a MAC filter
 my @f_rules = `iptables -L FORWARD --line-numbers | grep MAC | grep REJECT`;
@@ -43,31 +43,22 @@ my $all = $sth->fetchall_arrayref();
 my @r_macs = map { $_->[0] } @$all;
 
 # Set up the bedtime, ground and reward arrays
-my @f_bt_ru_a;
-my @n_bt_ru_a;
-my @f_gr_ru_a;
-my @f_rw_ru_a;
+my (@f_bt_ru_a,@n_bt_ru_a,@f_gr_ru_a,@f_rw_ru_a);
 
 # Process the bedtime rules
 procrule(\@f_rules,\@f_bt_ru_a);
 
 # Now the ground rules
 foreach (grep (!/ TIME from /, @f_rules)) {
-   my @bits = split(/\s*MAC\s*/);
-   my @bobs = split(/\s*reject-with\s*/,$bits[1]);
-   my $mac  = $bobs[0];
-   @bobs    = split(/\s*REJECT\s*/,$bits[0]);
-   my $line = $bobs[0];
+   my $line   = $& if (m/^\d*/);
+   my $mac    = $& if (m/MAC ([0-9A-F]{2}:){5}([0-9A-F]{2})/);
    push (@f_gr_ru_a,{line=>$line, mac=>$mac});
 }
 
 # And finally the reward rules
 foreach (@r_rules) {
-   my @bits = split(/\s*MAC\s*/);
-   my @bobs = split(/\s*-j ACCEPT/,$bits[1]);
-   my $mac  = $bobs[0];
-   @bobs    = split(/\s*ACCEPT\s*/,$bits[0]);
-   my $line = $bobs[0];
+   my $line   = $& if (m/^\d*/);
+   my $mac    = $& if (m/MAC ([0-9A-F]{2}:){5}([0-9A-F]{2})/);
    push (@f_rw_ru_a,{line=>$line, mac=>$mac});
 }
 
@@ -114,7 +105,7 @@ foreach my $old (@i_macs) {
                }
             }
          }
-         # Now create a modify rule from each set of old and new rules
+         # Now create modify tables from each set of old and new rules
          $tables .= mod_rule(\@old_we_rules,\@new_we_rules,'FORWARD');
          $tables .= mod_rule(\@old_sn_rules,\@new_sn_rules,'FORWARD'); 
          $tables .= mod_rule(\@old_we_rules,\@new_we_rules,'PREROUTING');
@@ -122,47 +113,44 @@ foreach my $old (@i_macs) {
          # Finally remove the mac from both old and new lists
          remove(\@i_macs_r,$old);
          remove(\@r_macs_r,$new);
-         # No need to check any other mac
-         last;
       }
    }
 }
 # Apply the replace iptables as they may change the line numbers
-#print "$tables\n";
 exec($tables);
 $tables = '';
-#die;
+
 # If there are old mac iptables, delete them
-unless (scalar(@i_macs)) {
+if (scalar(@i_macs_r)) {
    my @lines = ();
    # Refresh the arrays with the new rule order
    @f_rules = `iptables -L FORWARD --line-numbers | grep MAC | grep REJECT`;
    @n_rules = `iptables -t nat -L PREROUTING --line-numbers | grep MAC | grep REDIRECT`;
    procrule(\@f_rules,\@f_bt_ru_a);
-   foreach my $mac (@i_macs) {
+   foreach my $mac (@i_macs_r) {
       foreach (@f_bt_ru_a) {
          push (@lines, $_->{line}) if ($mac eq $_->{mac});
       }
    }
-   $tables .= "iptables FORWARD -D $_->{line}\n" foreach (reverse sort(@lines));
+   my %seen;
+   @lines = grep {! $seen{$_}++ } @lines;
+   $tables .= "iptables -D FORWARD $_\n" foreach (reverse sort(@lines));
    procrule(\@n_rules,\@n_bt_ru_a);
-   foreach my $mac (@i_macs) {
+   foreach my $mac (@i_macs_r) {
       foreach (@n_bt_ru_a) {
          push (@lines, $_->{line}) if ($mac eq $_->{mac});
       }
    }
-   $tables .= "iptables -t nat PREROUTING -D $_->{line}\n" foreach (reverse sort(@lines));
+   undef %seen;
+   @lines = grep {! $seen{$_}++ } @lines;
+   $tables .= "iptables -t nat -D PREROUTING $_\n" foreach (reverse sort(@lines));
 }
-print $tables . "\n";
-#exec($tables);
+exec($tables);
 $tables = '';
 
-# Keep tally for the rulesets per mac. Each needs two
-#my %tally;
-#$tally{$_} = 2 foreach(@r_macs);
 
 # Create add rules for the remaining new rules mac addresses
-foreach my $newmac (@r_macs) {
+foreach my $newmac (@r_macs_r) {
    foreach (@db_rule_a) {
       if ($newmac eq $_->{mac}) {
          my $mac = join(':',( lc($newmac) =~ m/../g ));
@@ -192,15 +180,8 @@ foreach my $newmac (@r_macs) {
       }
    }
 }
-#print $tables . "\n";
-#exec($tables);
-#die "done\n";
-print "MACs from iptables\n";
-print "$_\n" foreach(@i_macs);
-print "MACs from database\n";
-print "$_\n" foreach(@r_macs);
-#print $tables;
-#exec($tables);
+exec($tables);
+
 
 ### Subroutines ###
 
@@ -250,17 +231,13 @@ sub mod_rule {
    my ($old_ref,$new_ref,$chain) = (@_);
    my @old = @$old_ref;
    my @new = @$new_ref;
-
    # Set the action according to the table
    my $action = ($chain eq 'FORWARD') ? " -j REJECT\n" : " -p tcp --dport 80 -j REDIRECT --to-ports 3128\n";
    my $prefix = ($chain eq 'FORWARD') ? "iptables" : "iptables -t nat";
-
    # Return value for the iptables rule(s)
    my $ipt = '';
-
    # Add separators to the MAC and set it lowercase
    my $mac = join(':',( lc($old[0]->{mac}) =~ m/../g ));
-
    # If the bedtime straddles midnight, we'll need two new rules
    my $straddle = (time2secs($new[0]->{night}) > 43200) ? 1 : 0;
    # There are at least one each of new and old rules. Check if they're the same
@@ -280,7 +257,6 @@ sub mod_rule {
       $ipt .= "--weekdays " . mask2days($mask) if $mask;
       $ipt .= $action;
    }
-
    # Do we need a second rule?
    if ($straddle) {
       # Set days one day later
