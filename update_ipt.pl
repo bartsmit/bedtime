@@ -17,14 +17,13 @@ my $weekend = get_val('weekend');
 # Create array of days of the week
 my @weekdays = ('Mon','Tue','Wed','Thu','Fri','Sat','Sun');
 
-# Get all the current reject, redirect nat rules and accept rules with a MAC filter
+# Get all the current reject and redirect nat rules with a MAC filter
 my @f_rules = `iptables -L FORWARD --line-numbers | grep MAC | grep REJECT`;
 my @n_rules = `iptables -t nat -L PREROUTING --line-numbers | grep MAC | grep REDIRECT`;
-my @r_rules = `iptables -L FORWARD --line-numbers | grep MAC | grep ACCEPT`;
 
 # Collect all the MAC addresses from iptables
 my @i_macs;
-foreach (@f_rules, @n_rules, @r_rules) {
+foreach (@f_rules, @n_rules) {
    m/([0-9A-F]{2}:){5}([0-9A-F]{2})/;
    my $mac = $&;
    $mac =~ s/://g;
@@ -42,25 +41,11 @@ $sth->execute();
 my $all = $sth->fetchall_arrayref();
 my @r_macs = map { $_->[0] } @$all;
 
-# Set up the bedtime, ground and reward arrays
-my (@f_bt_ru_a,@n_bt_ru_a,@f_gr_ru_a,@f_rw_ru_a);
+# Set up the bedtime arrays
+my (@f_bt_ru_a,@n_bt_ru_a);
 
 # Process the bedtime rules
 procrule(\@f_rules,\@f_bt_ru_a);
-
-# Now the ground rules
-foreach (grep (!/ TIME from /, @f_rules)) {
-   my $line   = $& if (m/^\d*/);
-   my $mac    = $& if (m/MAC ([0-9A-F]{2}:){5}([0-9A-F]{2})/);
-   push (@f_gr_ru_a,{line=>$line, mac=>$mac});
-}
-
-# And finally the reward rules
-foreach (@r_rules) {
-   my $line   = $& if (m/^\d*/);
-   my $mac    = $& if (m/MAC ([0-9A-F]{2}:){5}([0-9A-F]{2})/);
-   push (@f_rw_ru_a,{line=>$line, mac=>$mac});
-}
 
 # Get all the new rules from the database
 my @db_rule_a;
@@ -153,7 +138,7 @@ $tables = '';
 foreach my $newmac (@r_macs_r) {
    foreach (@db_rule_a) {
       if ($newmac eq $_->{mac}) {
-         my $mac = join(':',( lc($newmac) =~ m/../g ));
+         my $mac = hex2col($newmac);
          my $todays = mask2days($_->{days});
          my $tomorrows = mask2days($_->{days} >> 1);
          my $start  = $_->{night};
@@ -181,9 +166,95 @@ foreach my $newmac (@r_macs_r) {
    }
 }
 exec($tables);
+$tables = '';
+
+# Set up the reward hash
+my %rw_mac;
+
+# Fill the reward tables array
+foreach (`iptables -L FORWARD --line-numbers | grep MAC | grep ACCEPT`) {
+   my $line = $& if (m/^\d*/);
+   my $mac  = $& if (m/MAC ([0-9A-F]{2}:){5}([0-9A-F]{2})/);
+   $mac =~ s/MAC //;
+   $rw_mac{lc($mac)} = $line;
+}
+print "rw_mac hash\n";
+dump (%rw_mac);
+# Find all the macs currently rewarded
+my @lines = ();
+$sth = $dbh->prepare("delete from reward where end < now()");
+$sth->execute();
+$sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from
+                      device inner join reward on device.user_id=reward.user_id");
+$sth->execute();
+
+# Add the line if the mac is in the reward tables
+while (my @row = $sth->fetchrow_array) {
+   my $mac = hex2col($row[0]);
+   push (@lines,$rw_mac{$mac}) if exists($rw_mac{$mac});
+}
+$tables .= "iptables -D FORWARD $_\n" foreach (reverse sort(@lines));
+print "lines array\n";
+dump (@lines);
+# Collect the current reward macs
+$sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from 
+                      reward inner join device on reward.user_id=device.user_id");
+$sth->execute();
+
+# And add the missing ones
+while (my @row = $sth->fetchrow_array) {
+   my $mac = hex2col($row[0]);
+   $tables .= "iptables -I FORWARD 1 -m mac --mac-source $mac -j ACCEPT\n" unless exists($rw_mac{$mac});
+}
+exec($tables);
+$tables = '';
+
+# Set up the ground hash
+my %gr_mac;
+
+# Fill the ground tables array
+foreach (`iptables -L FORWARD --line-numbers | grep MAC | grep -v TIME | grep REJECT`) {
+   my $line = $& if (m/^\d*/);
+   my $mac  = $& if (m/MAC ([0-9A-F]{2}:){5}([0-9A-F]{2})/);
+   $mac =~ s/MAC //;
+   $gr_mac{lc($mac)} = $line;
+}
+
+# Find all the macs currently grounded
+@lines = ();
+$sth = $dbh->prepare("delete from ground where end < now()");
+$sth->execute();
+$sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from
+                      device inner join ground on device.user_id=ground.user_id");
+$sth->execute();
+
+# Add the line if the mac is in the current ground tables
+while (my @row = $sth->fetchrow_array) {
+   my $mac = hex2col($row[0]);
+   push (@lines,$gr_mac{$mac}) if exists($gr_mac{$mac});
+}
+$tables .= "iptables -D FORWARD $_\n" foreach (reverse sort(@lines));
+
+# Collect the current ground macs
+$sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from
+                      ground inner join device on ground.user_id=device.user_id");
+$sth->execute();
+
+# Add the missing tables
+while (my @row = $sth->fetchrow_array) {
+   my $mac = hex2col($row[0]);
+   $tables .= "iptables -I FORWARD 1 -m mac --mac-source $mac -j REJECT\n" unless exists($gr_mac{$mac});
+}
+exec($tables);
 
 
 ### Subroutines ###
+
+# Change a hex mac into colon separated
+sub hex2col {
+   my $hex = shift;
+   join(':',( lc($hex) =~ m/../g ));
+}
 
 # Process an array of time rules
 sub procrule {
@@ -237,7 +308,7 @@ sub mod_rule {
    # Return value for the iptables rule(s)
    my $ipt = '';
    # Add separators to the MAC and set it lowercase
-   my $mac = join(':',( lc($old[0]->{mac}) =~ m/../g ));
+   my $mac = hex2col($old[0]->{mac});
    # If the bedtime straddles midnight, we'll need two new rules
    my $straddle = (time2secs($new[0]->{night}) > 43200) ? 1 : 0;
    # There are at least one each of new and old rules. Check if they're the same
@@ -291,11 +362,6 @@ sub mod_rule {
       }
    }
    $ipt;
-}
-
-# Create a time modifier from old and new times
-sub times2mod {
-   
 }
 
 # Find the number of seconds since midnight of a time in hh:mm:ss
