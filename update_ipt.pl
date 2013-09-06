@@ -149,18 +149,18 @@ foreach my $newmac (@r_macs_r) {
             $tables .= "--timestop $finish --weekdays $tomorrows -j REJECT\n";
             $tables .= "iptables -I FORWARD 1 -m mac --mac-source $mac -m time --timestart $start ";
             $tables .= "--timestop 23:59:59 --weekdays $todays -j REJECT\n";
-            $tables .= "iptables -t nat -I PREROUTING 1 -m mac --mac-source $mac -p tcp ! -d $myip ";
+            $tables .= "iptables -t nat -I PREROUTING 1 -m mac --mac-source $mac ";
             $tables .= "-m time --timestart 00:00:00 --timestop $finish --weekdays $tomorrows -m tcp ";
-            $tables .= "--dport 80 -j REDIRECT --to-ports 3128\n";
-            $tables .= "iptables -t nat -I PREROUTING 1 -m mac --mac-source $mac -p tcp ! -d $myip ";
+            $tables .= "-p tcp ! -d $myip --dport 80 -j REDIRECT --to-ports 3128\n";
+            $tables .= "iptables -t nat -I PREROUTING 1 -m mac --mac-source $mac ";
             $tables .= "-m time --timestart $start --timestop 23:59:59 --weekdays $todays -m tcp ";
-            $tables .= "--dport 80 -j REDIRECT --to-ports 3128\n";
+            $tables .= "-p tcp ! -d $myip --dport 80 -j REDIRECT --to-ports 3128\n";
          } else {
             $tables .= "iptables -I FORWARD 1 -m mac --mac-source $mac -m time --timestart $start ";
             $tables .= "--timestop $finish --weekdays $tomorrows -j REJECT\n";
-            $tables .= "iptables -t nat -I PREROUTING 1 -m mac --mac-source $mac -p tcp ! -d $myip ";
+            $tables .= "iptables -t nat -I PREROUTING 1 -m mac --mac-source $mac ";
             $tables .= "-m time --timestart $start --timestop $finish --weekdays $tomorrows -m tcp ";
-            $tables .= "--dport 80 -j REDIRECT --to-ports 3128\n";
+            $tables .= "-p tcp ! -d $myip --dport 80 -j REDIRECT --to-ports 3128\n";
          }
       }
    }
@@ -178,36 +178,33 @@ foreach (`iptables -L FORWARD --line-numbers | grep MAC | grep ACCEPT`) {
    $mac =~ s/MAC //;
    $rw_mac{lc($mac)} = $line;
 }
-print "rw_mac hash\n";
-dump (%rw_mac);
-# Find all the macs currently rewarded
+
+# Remove macs which are no longer rewarded
 my @lines = ();
+$sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from
+                      device inner join reward on device.user_id=reward.user_id
+                      where reward.end < now()");
+$sth->execute();
+while (my @row = $sth->fetchrow_array) {
+   my $mac = hex2col($row[0]);
+   push (@lines,$rw_mac{$mac}) if exists($rw_mac{mac});
+}
+$tables .= "iptables -D FORWARD $_\n" foreach (reverse sort(@lines));
+# And delete them from the database
 $sth = $dbh->prepare("delete from reward where end < now()");
 $sth->execute();
+
+# Find all the macs currently rewarded
 $sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from
                       device inner join reward on device.user_id=reward.user_id");
 $sth->execute();
-
-# Add the line if the mac is in the reward tables
 while (my @row = $sth->fetchrow_array) {
    my $mac = hex2col($row[0]);
-   push (@lines,$rw_mac{$mac}) if exists($rw_mac{$mac});
+   push (@lines,$mac) unless exists($rw_mac{$mac});
 }
-$tables .= "iptables -D FORWARD $_\n" foreach (reverse sort(@lines));
-print "lines array\n";
-dump (@lines);
-# Collect the current reward macs
-$sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from 
-                      reward inner join device on reward.user_id=device.user_id");
-$sth->execute();
-
-# And add the missing ones
-while (my @row = $sth->fetchrow_array) {
-   my $mac = hex2col($row[0]);
-   $tables .= "iptables -I FORWARD 1 -m mac --mac-source $mac -j ACCEPT\n" unless exists($rw_mac{$mac});
-}
+$tables .= "iptables -I FORWARD 1 -m mac --mac-source $_ -j ACCEPT\n" foreach (sort(@lines));
 exec($tables);
-$tables = '';
+$tables='';
 
 # Set up the ground hash
 my %gr_mac;
@@ -220,31 +217,30 @@ foreach (`iptables -L FORWARD --line-numbers | grep MAC | grep -v TIME | grep RE
    $gr_mac{lc($mac)} = $line;
 }
 
-# Find all the macs currently grounded
+# Remove macs which are no longer grounded
 @lines = ();
+$sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from
+                      device inner join ground on device.user_id=ground.user_id
+                      where ground.end < now()");
+$sth->execute();
+while (my @row = $sth->fetchrow_array) {
+   my $mac = hex2col($row[0]);
+   push (@lines,$gr_mac{$mac}) if exists($gr_mac{mac});
+}
+$tables .= "iptables -D FORWARD $_\n" foreach (reverse sort(@lines));
+# And delete them from the database
 $sth = $dbh->prepare("delete from ground where end < now()");
 $sth->execute();
+
+# Find all the macs currently grounded
 $sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from
                       device inner join ground on device.user_id=ground.user_id");
 $sth->execute();
-
-# Add the line if the mac is in the current ground tables
 while (my @row = $sth->fetchrow_array) {
    my $mac = hex2col($row[0]);
-   push (@lines,$gr_mac{$mac}) if exists($gr_mac{$mac});
+   push (@lines,$mac) unless exists($gr_mac{$mac});
 }
-$tables .= "iptables -D FORWARD $_\n" foreach (reverse sort(@lines));
-
-# Collect the current ground macs
-$sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from
-                      ground inner join device on ground.user_id=device.user_id");
-$sth->execute();
-
-# Add the missing tables
-while (my @row = $sth->fetchrow_array) {
-   my $mac = hex2col($row[0]);
-   $tables .= "iptables -I FORWARD 1 -m mac --mac-source $mac -j REJECT\n" unless exists($gr_mac{$mac});
-}
+$tables .= "iptables -I FORWARD 1 -m mac --mac-source $_ -j REJECT\n" foreach (sort(@lines));
 exec($tables);
 
 
@@ -303,7 +299,7 @@ sub mod_rule {
    my @old = @$old_ref;
    my @new = @$new_ref;
    # Set the action according to the table
-   my $action = ($chain eq 'FORWARD') ? " -j REJECT\n" : " -p tcp --dport 80 -j REDIRECT --to-ports 3128\n";
+   my $action = ($chain eq 'FORWARD') ? " -j REJECT\n" : " -p tcp ! -d $myip --dport 80 -j REDIRECT --to-ports 3128\n";
    my $prefix = ($chain eq 'FORWARD') ? "iptables" : "iptables -t nat";
    # Return value for the iptables rule(s)
    my $ipt = '';

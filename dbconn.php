@@ -8,7 +8,7 @@ foreach ($conf as $line) {
    $vals[$bits[0]] = rtrim($bits[1]);
 }
 
-$mysqli = new mysqli ($vals["dbhost"], $vals["dbwrite"], $vals["dbwpass"], $vals["dbname"]);
+$mysqli = new mysqli ($vals["dbhost"], $vals["dbuser"], $vals["dbpass"], $vals["dbname"]);
 
 if ($mysqli->connect_errno) {
    printf("Connect failed: %s\n",$mysqli->connect_error);

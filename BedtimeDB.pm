@@ -26,7 +26,7 @@ sub dbconn {
 
    # Collect the credentials and connect to the database
    my $user = $vals{'dbuser'};
-   my $pass = $vals{'dbupass'};
+   my $pass = $vals{'dbpass'};
    my $dbis = "DBI:mysql:".$vals{'dbname'}.":".$vals{'dbhost'};
    DBI->connect($dbis,$user,$pass) or die "Cannot connect to database $dbis with user $user - $!\n";
 }
