@@ -1,4 +1,5 @@
 #!/usr/bin/perl
+BEGIN {push @INC,'/var/www/html/bedtime/perl'}
 
 use DBI;
 use LWP::Simple;

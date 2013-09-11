@@ -14,6 +14,17 @@ $rewu = (isset($_GET['reward_num']))  ? $_GET['reward_num']  : '';
 $rewt = (isset($_GET['reward_time'])) ? $_GET['reward_time'] : '';
 $rewd = (isset($_GET['reward_date'])) ? $_GET['reward_date'] : '';
 
+$sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
+if ($sock === false) {
+   echo "socket_create failed. reason: ". socket_error(socke_last_error()) . "\n";
+}
+$result = socket_connect($sock,'127.0.0.1',5000);
+if ($result === false) {
+   echo "socket_connect failed. reason: ".socket_error(socket_last_error($socket)) . "\n";
+}
+$buf = "u\n";
+socket_write($sock,$buf,strlen($buf));
+
 $four = (($awst != '') && ($awnd != '') && ($asst != '') && ($asnd != ''));
 $res = squery("select value from settings where variable='weekend'",$mysqli);
 $weekend = $res['value']; $weekdays = 254 ^ $weekend;

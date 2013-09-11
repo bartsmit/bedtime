@@ -1,9 +1,12 @@
 #!/usr/bin/perl
 
+BEGIN {push @INC,'/var/www/html/bedtime/perl'}
+
 use BedtimeDB qw(get_val);
 use DBI;
 use Data::Dump qw(dump);
 use strict;
+use warnings;
 
 # Connect to the database
 my $dbh = &BedtimeDB::dbconn;
@@ -32,7 +35,7 @@ foreach (@f_rules, @n_rules) {
 
 # Filter for unique values
 my %seen;
-my @i_macs = grep {! $seen{$_}++ } @i_macs;
+@i_macs = grep {! $seen{$_}++ } @i_macs;
 
 # Get all unique MAC addresses from the rules table
 my $sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from rules
@@ -49,7 +52,7 @@ procrule(\@f_rules,\@f_bt_ru_a);
 
 # Get all the new rules from the database
 my @db_rule_a;
-my $sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac, night, morning, days
+$sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac, night, morning, days
                          from rules inner join device on rules.user_id=device.user_id");
 $sth->execute();
 while (my @row = $sth->fetchrow_array) {
@@ -102,7 +105,7 @@ foreach my $old (@i_macs) {
    }
 }
 # Apply the replace iptables as they may change the line numbers
-exec($tables);
+system($tables);
 $tables = '';
 
 # If there are old mac iptables, delete them
@@ -130,7 +133,7 @@ if (scalar(@i_macs_r)) {
    @lines = grep {! $seen{$_}++ } @lines;
    $tables .= "iptables -t nat -D PREROUTING $_\n" foreach (reverse sort(@lines));
 }
-exec($tables);
+system($tables);
 $tables = '';
 
 
@@ -165,11 +168,15 @@ foreach my $newmac (@r_macs_r) {
       }
    }
 }
-exec($tables);
+system($tables);
 $tables = '';
 
 # Set up the reward hash
 my %rw_mac;
+
+# Delete all old ground rows
+$sth = $dbh->prepare("delete from reward where end < now()");
+$sth->execute();
 
 # Fill the reward tables array
 foreach (`iptables -L FORWARD --line-numbers | grep MAC | grep ACCEPT`) {
@@ -179,69 +186,92 @@ foreach (`iptables -L FORWARD --line-numbers | grep MAC | grep ACCEPT`) {
    $rw_mac{lc($mac)} = $line;
 }
 
-# Remove macs which are no longer rewarded
-my @lines = ();
-$sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from
-                      device inner join reward on device.user_id=reward.user_id
-                      where reward.end < now()");
+# Find new macs from the reward table
+$sth = $dbh->prepare("select lower(lpad(hex(device.mac),12,'0')) as mac,
+                      datediff(now(),end) as daystogo, time(end) as finish
+                      from device inner join reward on device.user_id=reward.user_id");
 $sth->execute();
-while (my @row = $sth->fetchrow_array) {
-   my $mac = hex2col($row[0]);
-   push (@lines,$rw_mac{$mac}) if exists($rw_mac{mac});
-}
-$tables .= "iptables -D FORWARD $_\n" foreach (reverse sort(@lines));
-# And delete them from the database
-$sth = $dbh->prepare("delete from reward where end < now()");
-$sth->execute();
+my $ref = $sth->fetchall_arrayref;
 
-# Find all the macs currently rewarded
-$sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from
-                      device inner join reward on device.user_id=reward.user_id");
-$sth->execute();
-while (my @row = $sth->fetchrow_array) {
-   my $mac = hex2col($row[0]);
-   push (@lines,$mac) unless exists($rw_mac{$mac});
+# Find all the iptables macs that are no longer in the reward table
+my %cp_mac = %rw_mac;
+foreach my $rowref (@$ref) {
+   my @row = @$rowref;
+   my $d_mac = hex2col($row[0]);
+   # Delete the reward table mac from the iptables hash copy
+   delete($cp_mac{$d_mac}) if exists($cp_mac{$d_mac});
 }
-$tables .= "iptables -I FORWARD 1 -m mac --mac-source $_ -j ACCEPT\n" foreach (sort(@lines));
-exec($tables);
+
+# Now the copy hash only has macs not in the reward table
+my @dlines=();
+push (@dlines,$cp_mac{$_}) foreach (keys %cp_mac);
+
+# Delete these from iptables
+$tables .= "iptables -D FORWARD $_\n" foreach (reverse sort(@dlines));
+
+# Find the new macs from the reward table not already in iptables
+my @nmacs = ();
+foreach my $rowref (@$ref) {
+   my @row = @$rowref;
+   my $mac = hex2col($row[0]);
+   # Add an end time if the reward finishes today
+   my $mod = ($row[1] == 0) ? "$mac -m time --timestop ".$row[2] : $mac;
+   push (@nmacs,$mod) unless exists($rw_mac{$mac});
+}
+$tables .= "iptables -I FORWARD 1 -m mac --mac-source $_ -j REJECT\n" foreach (@nmacs);
+print $tables;
+system($tables);
 $tables='';
 
 # Set up the ground hash
 my %gr_mac;
 
+# Delete all old ground rows
+$sth = $dbh->prepare("delete from ground where end < now()");
+$sth->execute();
+
 # Fill the ground tables array
-foreach (`iptables -L FORWARD --line-numbers | grep MAC | grep -v TIME | grep REJECT`) {
+foreach (`iptables -L FORWARD --line-numbers | grep MAC | grep -v ' on ' | grep REJECT`) {
    my $line = $& if (m/^\d*/);
    my $mac  = $& if (m/MAC ([0-9A-F]{2}:){5}([0-9A-F]{2})/);
    $mac =~ s/MAC //;
    $gr_mac{lc($mac)} = $line;
 }
 
-# Remove macs which are no longer grounded
-@lines = ();
-$sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from
-                      device inner join ground on device.user_id=ground.user_id
-                      where ground.end < now()");
+# Find new macs from the ground table
+$sth = $dbh->prepare("select lower(lpad(hex(device.mac),12,'0')) as mac,
+                      datediff(now(),end) as daystogo, time(end) as finish
+                      from device inner join ground on device.user_id=ground.user_id");
 $sth->execute();
-while (my @row = $sth->fetchrow_array) {
-   my $mac = hex2col($row[0]);
-   push (@lines,$gr_mac{$mac}) if exists($gr_mac{mac});
-}
-$tables .= "iptables -D FORWARD $_\n" foreach (reverse sort(@lines));
-# And delete them from the database
-$sth = $dbh->prepare("delete from ground where end < now()");
-$sth->execute();
+$ref = $sth->fetchall_arrayref;
 
-# Find all the macs currently grounded
-$sth = $dbh->prepare("select lpad(hex(device.mac),12,'0') as mac from
-                      device inner join ground on device.user_id=ground.user_id");
-$sth->execute();
-while (my @row = $sth->fetchrow_array) {
-   my $mac = hex2col($row[0]);
-   push (@lines,$mac) unless exists($gr_mac{$mac});
+# Find all the iptables macs that are no longer in the ground table
+%cp_mac = %gr_mac;
+foreach my $rowref (@$ref) {
+   my @row = @$rowref;
+   my $d_mac = hex2col($row[0]);
+   # Delete the ground table mac from the iptables hash copy
+   delete($cp_mac{$d_mac}) if exists($cp_mac{$d_mac});
 }
-$tables .= "iptables -I FORWARD 1 -m mac --mac-source $_ -j REJECT\n" foreach (sort(@lines));
-exec($tables);
+# Now the copy hash only has macs not in the ground table
+@dlines=();
+push (@dlines,$cp_mac{$_}) foreach (keys %cp_mac);
+
+# Delete these from iptables
+$tables .= "iptables -D FORWARD $_\n" foreach (reverse sort(@dlines));
+
+# Find the new macs from the ground table not already in iptables
+@nmacs = ();
+foreach my $rowref (@$ref) {
+   my @row = @$rowref;
+   my $mac = hex2col($row[0]);
+   # Add an end time if the ground finishes today
+   my $mod = ($row[1] == 0) ? "$mac -m time --timestop ".$row[2] : $mac;
+   push (@nmacs,$mod) unless exists($gr_mac{$mac});
+}
+$tables .= "iptables -I FORWARD 1 -m mac --mac-source $_ -j REJECT\n" foreach (@nmacs);
+system($tables);
+
 
 
 ### Subroutines ###
@@ -255,7 +285,7 @@ sub hex2col {
 # Process an array of time rules
 sub procrule {
    my ($in,$out) = (@_);
-   foreach (grep(/ TIME from /, @$in)) {
+   foreach (grep(/ on /, @$in)) {
       # Match each part of the iptables output
       my $line   = $& if (m/^\d*/);
       my $mac    = $& if (m/MAC ([0-9A-F]{2}:){5}([0-9A-F]{2})/);
@@ -266,7 +296,7 @@ sub procrule {
       if (m/on ([a-zA-Z]{3})(,[a-zA-Z]{3})+/) {
          my $days = $&;
          $days =~ s/^on //;
-         for (my $i=0;$i<8;$i++) {
+         for (my $i=0;$i<7;$i++) {
             my $try = $weekdays[$i];
             $mask = $mask | (128 >> $i) if ($days =~ /$try/);
          }
@@ -283,7 +313,7 @@ sub remove {
    my ($ref, $val) = (@_);
 
    # Get the index of the record
-   my $i;
+   my $i=0;
    foreach (@$ref) {
       last if ($_ eq $val);
       $i++;
