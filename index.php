@@ -14,14 +14,11 @@ $rewu = (isset($_GET['reward_num']))  ? $_GET['reward_num']  : '';
 $rewt = (isset($_GET['reward_time'])) ? $_GET['reward_time'] : '';
 $rewd = (isset($_GET['reward_date'])) ? $_GET['reward_date'] : '';
 
+$mysqli->query("delete from ground where end < now()");
+$mysqli->query("delete from reward where end < now()");
+
 $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
-if ($sock === false) {
-   echo "socket_create failed. reason: ". socket_error(socke_last_error()) . "\n";
-}
 $result = socket_connect($sock,'127.0.0.1',5000);
-if ($result === false) {
-   echo "socket_connect failed. reason: ".socket_error(socket_last_error($socket)) . "\n";
-}
 $buf = "u\n";
 socket_write($sock,$buf,strlen($buf));
 
@@ -30,7 +27,9 @@ $res = squery("select value from settings where variable='weekend'",$mysqli);
 $weekend = $res['value']; $weekdays = 254 ^ $weekend;
 $sql_lst = "select child.user_id,name,description,
             (select count(*) from ground where ground.user_id=rules.user_id) as gc,
+            (select max(end) from ground where ground.user_id=rules.user_id) as ge,
             (select count(*) from reward where reward.user_id=rules.user_id) as rc,
+            (select max(end) from reward where reward.user_id=rules.user_id) as re,
             max(if(days=$weekend, night,null)) as w_fm,
             max(if(days=$weekend, morning,null)) as w_to,
             max(if(days=$weekdays,night,null)) as s_fm,
@@ -111,10 +110,11 @@ if ($numrows == 0) {
       $id = $row['user_id']; $cn = $row['name']; $ds = $row['description'];
       $children[$id] = $cn;
       $wf = $row['w_fm'];$wt = $row['w_to']; $sf = $row['s_fm']; $st = $row['s_to'];
-      $gn = ($row['gc'] > 0) ? ' <strong>G</strong>' : '';
-      $rn = ($row['rc'] > 0) ? ' <strong>R</strong>' : '';
-      echo "<tr><td>$cn</td><td align=\"right\">$ds</td><td align=\"right\">";
-      echo $gn.$rn."<input type=\"checkbox\" name=\"sel$id\" value=\"sel$id\"></td>\n";
+      $en = ''; $rn = ''; $gn = '';
+      if ($row['rc'] > 0) { $rn = " <strong>R</strong>"; $en = "reward ends ".$row['re']; }
+      if ($row['gc'] > 0) { $gn = " <strong>G</strong>"; $en = "ground ends ".$row['ge']; }
+      echo "<tr><td><div title =\"$en\">$cn $gn $rn</div></td><td align=\"right\">$ds</td><td align=\"right\">";
+      echo "<input type=\"checkbox\" name=\"sel$id\" value=\"sel$id\"></td>\n";
       echo "<td align=\"right\"><input type=\"text\" name=\"w_start$id\" value=\"$wf\" size=\"8\"></td>\n";
       echo "<td align=\"right\"><input type=\"text\" name=\"w_end$id\" value=\"$wt\" size=\"8\"></td>\n";
       echo "<td align=\"right\"><input type=\"text\" name=\"s_start$id\" value=\"$sf\" size=\"8\"></td>\n";

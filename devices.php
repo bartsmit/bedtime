@@ -6,6 +6,19 @@ padding: 1px 5px;
 </style>
 <?php
 include "dbconn.php";
+
+$sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
+$result = socket_connect($sock,'127.0.0.1',5000);
+$buf = "d\n";
+socket_write($sock,$buf,strlen($buf));
+
+if (isset($_GET["manlst"])) {
+   $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
+   $buf = "m\n";
+   $result = socket_connect($sock,'127.0.0.1',5000);
+   socket_write($sock,$buf,strlen($buf));
+}
+
 $res = $mysqli->query("select user_id, name from child order by name");
 $numrows = $res->num_rows;
 if ($numrows > 0) {
@@ -64,6 +77,8 @@ $kill_list = rtrim($kill_list,',');
 $res = $mysqli->query("delete from device where mac in ($kill_list)");
 ?>
 </table><br>
+Press submit to update devices.
+<input type="checkbox" name="manlst"> also update manufacturers list (may take a minute)<br>
 <input type="submit" value="submit">
 </form>
 <a href="index.php">return</a>

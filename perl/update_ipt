@@ -218,7 +218,7 @@ foreach my $rowref (@$ref) {
    my $mod = ($row[1] == 0) ? "$mac -m time --timestop ".$row[2] : $mac;
    push (@nmacs,$mod) unless exists($rw_mac{$mac});
 }
-$tables .= "iptables -I FORWARD 1 -m mac --mac-source $_ -j REJECT\n" foreach (@nmacs);
+$tables .= "iptables -I FORWARD 1 -m mac --mac-source $_ -j ACCEPT\n" foreach (@nmacs);
 print $tables;
 system($tables);
 $tables='';

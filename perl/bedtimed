@@ -31,8 +31,8 @@ close PID;
 # Launch scripts according to socket input
 while ( my $client = $socket->accept() ) {
    chomp ( my $input = <$client> );
-   system("update_ipt") if $input =~ /^u/;
-   system("dhcp_slurp") if $input =~ /^d/;
-   system("get_manlst") if $input =~ /^m/;
+   system("/usr/local/bin/update_ipt") if $input =~ /^u/;
+   system("/usr/local/bin/dhcp_slurp") if $input =~ /^d/;
+   system("/usr/local/bin/get_manlst") if $input =~ /^m/;
    close $client;
 }
