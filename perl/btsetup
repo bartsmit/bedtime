@@ -1,6 +1,20 @@
 #!/usr/bin/perl
 
-use warning;
+use warnings;
 use strict;
 
-
+if ($ARGV[0] eq 'step1') {
+   my $pass = $ARGV[1];
+   # Read the conf file into an array
+   open (CONF, "/etc/bedtime.conf");
+   my @lines = <CONF>;
+   # Take out the dbpass line
+   my $conf = join("",grep(!/^dbpass/,@lines));
+   # Write it back to the conf file
+   open (CONF, ">/etc/bedtime.conf");
+   print CONF "$conf";
+   # And add the new dbpass
+   print CONF "dbpass = $pass\n";
+   close CONF;
+#   system("mysql -u sleepy -p$pass bedtime < /usr/share/bedtime/setup.sql");
+}
