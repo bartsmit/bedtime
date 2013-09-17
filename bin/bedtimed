@@ -1,0 +1,43 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use POSIX qw( setsid );
+use IO::Socket;
+
+# Open the socket on TCP 5000
+my $socket = IO::Socket::INET->new(
+   'Proto'     => 'tcp',
+   'LocalPort' => 5000,
+   'Listen'    => 5,
+   'Reuse'     => 1,
+);
+die "Cannot open socket on port 5000: $!" unless ($socket);
+
+# Disconnect from the terminal
+chdir '/' or die "Cannot cd to /: $!";
+open STDIN, '/dev/null' or die "Cannot read /dev/null: $!";
+open STDOUT, '>/dev/null' or die "Cannot write /dev/null: $!";
+defined(my $pid = fork) or die "Cannot fork: $!";
+exit if $pid;
+setsid or die "Cannot start new session: $!";
+open STDERR, '>&STDOUT' or exec("logger Cannot duplicate output: $!");
+
+# Write the process ID
+open  PID, ">/var/run/bedtimed.pid" or exec("logger Cannot open pid file: $!");
+print PID  "$$\n" or exec("logger Cannot write to pid file: $!");
+close PID;
+
+# Launch scripts according to socket input
+while ( my $client = $socket->accept() ) {
+   chomp ( my $input = <$client> );
+   system("/usr/share/bedtime/bin/update_ipt") if $input =~ /^u/;
+   system("/usr/share/bedtime/bin/dhcp_slurp") if $input =~ /^d/;
+   system("/usr/share/bedtime/bin/get_manlst") if $input =~ /^m/;
+   system("/usr/share/bedtime/bin/survey_net") if $input =~ /^s/;
+   if ($input =~ /^p/) {
+      my $pass =~ s/^p//;
+      system("/usr/share/bedtime/bin/btsetup $pass");
+   }
+   close $client;
+}

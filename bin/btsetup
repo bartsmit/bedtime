@@ -1,0 +1,41 @@
+#!/usr/bin/perl
+
+use warnings;
+use strict;
+
+my $pass = $ARGV[0];
+my $conf = '';
+
+# Read the conf file into an array
+open (CONF, "/etc/bedtime.conf");
+my @lines = <CONF>;
+
+# Look for the dbpass line
+foreach my $line (@lines) {
+   if ($line =~ m/dbpass/) {
+      $conf .= "$`$& $pass\n";
+   } else {
+      $conf .= $line;
+   }
+} 
+# Write it back to the conf file
+open (CONF,">/etc/bedtime.conf");
+print CONF "$conf";
+# And add the new dbpass
+print CONF "dbpass = $pass\n";
+close CONF;
+
+# Do the same for the apache conf file
+$conf = '';
+open (CONF, "/etc/httpd/conf.d/bedtime.conf");
+@lines = <CONF>;
+foreach my $line (@lines) {
+   if ($line =~ m/AuthMySQLPassword/) {
+      $conf .= "$`$& $pass\n";
+   } else {
+      $conf .= $line;
+   }
+}
+open (CONF,">/etc/httpd/conf.d/bedtime.conf");
+print CONF "$conf";
+close CONF;
