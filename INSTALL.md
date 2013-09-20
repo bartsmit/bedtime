@@ -1,6 +1,6 @@
 bedtime installation
 ====================
-Perform a minimum CentOS install on a spare computer
+Perform a minimum CentOS install on a spare computer<br>
 
 Install the prerequisite packages:
   sudo yum -y install php-mysql mysql-server mod_auth_mysql squid avahi nss-mdns dbus ntp
