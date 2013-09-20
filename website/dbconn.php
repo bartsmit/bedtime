@@ -10,10 +10,6 @@ foreach ($conf as $line) {
 
 $mysqli = new mysqli ($vals["dbhost"], $vals["dbuser"], $vals["dbpass"], $vals["dbname"]);
 
-if ($mysqli->connect_errno) {
-   printf("Connect failed: %s\n",$mysqli->connect_error);
-}
-
 function squery($sql,$mysqli) {
    if ($result = $mysqli->query($sql)) {
       if (strtolower(substr($sql,0,6)) == 'select') {

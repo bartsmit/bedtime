@@ -89,9 +89,10 @@ if ($rewi != '') {
 }
 ?>
 <html><head><title>Bedtime</title></head><body>
->> <a href="addchild.php">Add/remove a child</a>
+<h1>Bedtime</h1>
+<h2><a href="addchild.php">Add/remove a child</a></h2>
 <hr>
->> Edit bedtimes
+<h2>Edit bedtimes</h2>
 <form name="main">
 <?php
 $res = $mysqli->query($sql_lst);
@@ -125,7 +126,8 @@ if ($numrows == 0) {
 ?>
 <br>Edit bedtime per child, or edit all selected children in the top row. Tick the top box to apply top row to all children.
 <hr>
->> Ground <select name="ground">
+<h2>Ground</h2>
+<select name="ground">
 <option value=""></option>
 <?php
 foreach ($children as $id => $name) {
@@ -138,7 +140,7 @@ foreach ($children as $id => $name) {
 </select> Or until <input type="text" size="8" name="ground_time"> hh:mm:ss on <input type="text" size="8" name="ground_date"> yyyy-mm-dd<br>
 <br>Remove a child from grounding by grounding them for zero hours
 <hr>
->> Reward
+<h2>Reward</h2>
 <select name="reward">
 <option value=""></option>
 <?php
@@ -152,9 +154,9 @@ foreach ($children as $id => $name) {
 </select> Or until <input type="text" size="8" name="reward_time"> hh:mm:ss on <input type="text" size="8" name="reward_date"> yyyy-mm-dd<br>
 <br>Remove a child's reward by rewarding them for zero hours.
 <hr>
->> <a href="devices.php">Devices</a>
+<h2><a href="devices.php">Devices</a></h2>
 <hr>
->> <a href="settings.php">Settings</a>
+<h2><a href="settings.php">Parents and Settings</a></h2>
 <hr>
 <input type="submit" value="submit">
 </form><br>

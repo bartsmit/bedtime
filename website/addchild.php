@@ -29,7 +29,7 @@ if (($name != '') && ($copy == 'copy') && ($orig != '')) {
    header("Location: index.php");
 } else {
    echo "<html><head><title>Add a child</title></head><body>\n";
-   echo ">> Add<hr>";
+   echo "<h1>Add/Remove a Child</h1><h2>Add</h2>";
    echo "<form name=\"addchild\">\n";
    $res = $mysqli->query("select user_id,name from child order by name");
    $numrows = $res->num_rows;
@@ -64,7 +64,7 @@ Name: <input type="text" name="name" value="<?php echo $name;?>"> Description: <
 <tr><td>School night</td><td>Start:</td><td><input type="text" name="weekstart"></td><td>End:</td><td><input type="text" name="week_end"></td></tr>
 </table>
 <hr>
->> Remove<br>
+<h2>Remove</h2>
 <select name="gone">
 <option value=""> </option>
 <?php
@@ -72,7 +72,7 @@ foreach ($children as $id => $name) {
    echo "<option value=\"$id\">$name</option>\n"; 
 }
 ?>
-</select> Is responsible enough to switch off their devices for bed. Remove them from bedtime.<br><br>
+</select> Is responsible enough to switch off their devices for bed. Remove them from bedtime.<br><br><hr>
 <input type="submit" value="submit">
 </form>
 <br>Cancel and <a href="index.php">return</a>

@@ -31,7 +31,7 @@ if ($numrows > 0) {
 } else {
    header("Location: addchild.php");
 }
-echo "<html><head><title>Manage Devices</title></head><body>\n";
+echo "<html><head><title>Manage Devices</title></head><body><h1>Devices</h1>\n";
 echo "Assign a child to each device from the drop-down list. Delete devices that are no longer around<br>\n";
 $sql  = "select inet_ntoa(ip) as ip,
          (select name from child where device.user_id = child.user_id) as owner,
@@ -78,7 +78,7 @@ $res = $mysqli->query("delete from device where mac in ($kill_list)");
 ?>
 </table><br>
 Press submit to update devices.
-<input type="checkbox" name="manlst"> also update manufacturers list (may take a minute)<br>
+<input type="checkbox" name="manlst"> also update manufacturers list (may take a minute)<br><hr>
 <input type="submit" value="submit">
 </form>
 <a href="index.php">return</a>

@@ -39,5 +39,6 @@ while ( my $client = $socket->accept() ) {
       my $pass =~ s/^p//;
       system("/usr/share/bedtime/bin/btsetup $pass");
    }
+   system("logger socket 5000 received $input");
    close $client;
 }

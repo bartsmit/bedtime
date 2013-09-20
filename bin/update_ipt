@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-BEGIN {push @INC,'/var/www/html/bedtime/perl'}
+BEGIN {push @INC,'/usr/share/bedtime/bin'}
 
 use BedtimeDB qw(get_val);
 use DBI;
@@ -272,6 +272,8 @@ foreach my $rowref (@$ref) {
 $tables .= "iptables -I FORWARD 1 -m mac --mac-source $_ -j REJECT\n" foreach (@nmacs);
 system($tables);
 
+# Save the new iptables in the boot script
+system("/etc/init.d/iptables save");
 
 
 ### Subroutines ###

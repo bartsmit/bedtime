@@ -1,7 +1,11 @@
 #!/usr/bin/perl
 
+BEGIN {push @INC,'/usr/share/bedtime/bin'}
+
 use warnings;
 use strict;
+use BedtimeDB qw(get_val set_val long2ip ip2long);
+use Data::Dump qw(dump);
 
 my $pass = $ARGV[0];
 my $conf = '';
@@ -9,11 +13,13 @@ my $conf = '';
 # Read the conf file into an array
 open (CONF, "/etc/bedtime.conf");
 my @lines = <CONF>;
+close CONF;
 
 # Look for the dbpass line
 foreach my $line (@lines) {
    if ($line =~ m/dbpass/) {
-      $conf .= "$`$& $pass\n";
+      # Replace the password
+      $conf .= "$`$& = $pass\n";
    } else {
       $conf .= $line;
    }
@@ -21,17 +27,14 @@ foreach my $line (@lines) {
 # Write it back to the conf file
 open (CONF,">/etc/bedtime.conf");
 print CONF "$conf";
-# And add the new dbpass
-print CONF "dbpass = $pass\n";
-close CONF;
 
 # Do the same for the apache conf file
 $conf = '';
 open (CONF, "/etc/httpd/conf.d/bedtime.conf");
 @lines = <CONF>;
 foreach my $line (@lines) {
-   if ($line =~ m/AuthMySQLPassword/) {
-      $conf .= "$`$& $pass\n";
+   if ($line =~ m/AuthMySQLPassword /) {
+      $conf .= "$`$&$pass\n";
    } else {
       $conf .= $line;
    }
@@ -39,3 +42,162 @@ foreach my $line (@lines) {
 open (CONF,">/etc/httpd/conf.d/bedtime.conf");
 print CONF "$conf";
 close CONF;
+system("/etc/init.d/httpd restart");
+
+# Survey the network stack
+system("/usr/share/bedtime/bin/survey_net");
+
+# Use the results
+open (NET, "/usr/share/bedtime/network");
+my ($myip,$mydg,$dhcp,$mask,$myif);
+foreach (<NET>) {
+   chomp;
+   my @bits = split(/\//);
+   if ($bits[1] eq 'dhcp') {
+      $dhcp = $bits[0];
+   } elsif ($bits[1] eq 'dg') {
+      $mydg = $bits[0];
+   } elsif ($bits[1] =~ m/m$/) {
+      $myip = $bits[0];
+      $mask = $bits[1];
+      $mask =~ s/m$//;
+      $myif = $bits[2];
+      chomp($myif);
+   }
+}
+close NET;
+
+# Write survey details into the database
+set_val('myip',$myip);
+set_val('mydg',$mydg);
+set_val('dhcp',$dhcp);
+set_val('mask',$mask);
+set_val('myif',$myif);
+ 
+# Change prefix to netmask
+my $nm_num;
+for(my $i=0;$i<$mask;$i++) {
+   $nm_num += 2147483648 >> $i;
+}
+# And calculete the size of the subnet
+my $width;
+for(my $i=0;$i<(32-$mask);$i++) {
+   $width += 1 << $i;
+}
+# Calculate some handy metrics
+my $netmask = long2ip($nm_num);
+my $network = long2ip($nm_num & ip2long($myip));
+my $broadcast = long2ip(ip2long($network)+$width);
+
+# Write survey details into the database
+set_val('myip',$myip);
+set_val('mydg',$mydg);
+set_val('dhcp',$dhcp);
+set_val('mask',$mask);
+set_val('myif',$myif);
+
+# Change the interface to static
+if ((-e "/etc/sysconfig/network-scripts/ifcfg-$myif") &&
+   (`grep $myip /etc/sysconfig/network-scripts/ifcfg-$myif | wc -l` == 0)) {
+   system("cp -f /etc/sysconfig/network-scripts/ifcfg-$myif /etc/sysconfig/network-scripts/ifcfg-$myif.bak");
+   open (CFG,">/etc/sysconfig/network-scripts/ifcfg-$myif");
+   print CFG "DEVICE=$myif\n";
+   print CFG "ONBOOT=yes\n";
+   print CFG "IPADDR=$myip\n";
+   print CFG "PREFIX=$mask\n";
+   print CFG "GATEWAY=$mydg\n";
+   print CFG "NM_CONTROLLED=no\n";
+   close CFG;
+} elsif ((-e "/etc/network/interfaces") &&
+   (`grep $myip /etc/network/interfaces | wc -l` == 0)) {
+   system("cp -f /etc/network/interfaces /etc/network/interfaces.bak");
+   open (CFG,">/etc/network/interfaces");
+   print CFG "auto lo\niface lo inet loopback\n";
+   print CFG "auto $myif\n";
+   print CFG "iface $myif inet static\naddress $myip\n";
+   print CFG "netmask $netmask\ngateway $mydg\n";
+   close CFG;
+}
+# And restart the network
+if (-e "/etc/init.d/network") {
+   system("/etc/init.d/network restart");
+} elsif (-e "/etc/init.d/networking") {
+   system("/etc/init.d/networking restart");
+}
+
+# The dhcp range excludes statics
+my @excludes;
+push (@excludes,ip2long($network));
+push (@excludes,ip2long($myip));
+push (@excludes,ip2long($mydg));
+push (@excludes,ip2long($dhcp)) unless ($dhcp eq $mydg);
+push (@excludes,ip2long($network)+$width);
+@excludes = sort(@excludes);
+# Convert the space between the excludes as dhcp ranges
+my $ranges;
+my $rank = 0;
+my $max = scalar @excludes - 1;
+foreach (@excludes) {
+   $ranges .= " ".long2ip($_ - 1).";\n" unless ($rank == 0);
+   $ranges .= "range ".long2ip($_ + 1)  unless ($rank == $max);
+   $rank++;
+}
+# Take out ranges too close to the edges
+my @r_array = split (/\n/,$ranges);
+$ranges='';
+foreach (@r_array) {
+   $ranges .= "$_\n" unless((m/$network/) or (m/$broadcast/));
+}
+
+# Find the DNS servers
+if (get_val('dns') eq 'isp') {
+   my $dns_servers;
+   open (DNS,"/etc/resolv.conf");
+   my @dns = <DNS>;
+   foreach (@dns) {
+      if (m/^nameserver/) {
+         s/^nameserver\s+//;
+         chomp;
+         $dns_servers .= "$_, ";
+      }
+   }
+   $dns_servers =~ s/, $/;/;
+} else {
+   # Or use the OpenDNS servers
+   $dns_servers = '208.67.222.222, 208.67.220.220;';
+}
+
+# Set up the DHCP configuration
+if ((-e "/etc/dhcp/dhcpd.conf") &&
+   (`grep $network /etc/dhcp/dhcpd.conf | wc -l` == 0)) {
+   system("cp -f /etc/dhcp/dhcpd.conf /etc/dhcp/dhcpd.conf.bak");
+   open (CFG,">/etc/dhcp/dhcpd.conf");
+   print CFG "subnet $network netmask $netmask {\n";
+   print CFG "option routers $myip;\n";
+   print CFG "option domain-name-servers $dns_servers\n";
+   print CFG $ranges;
+   print CFG "}\n";
+   close CFG;
+}
+
+if (-e "/etc/init.d/dhcpd restart") {
+   system("/etc/init.d/dhcpd restart");
+} elsif (-e  "/etc/init.d/networking") {
+   system("/etc/init.d/networking restart");
+}
+
+# Enable routing
+open (CONF, "/etc/sysctl.conf");
+@lines = <CONF>;
+close CONF;
+
+# Look for the sysctl line
+foreach my $line (@lines) {
+   if ($line =~ m/net\.ipv4\.ip_forward/) {
+      # Replace with 1
+      $conf .= "$`$& = 1\n";
+   } else {
+      $conf .= $line;
+   }
+}
+system("sysctl -p");

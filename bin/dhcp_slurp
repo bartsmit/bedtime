@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-BEGIN {push @INC,'/var/www/html/bedtime/perl'}
+BEGIN {push @INC,'/usr/share/bedtime/bin'}
 
 use BedtimeDB;
 use DBI;
