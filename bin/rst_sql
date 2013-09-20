@@ -1,8 +1,0 @@
-#!/bin/bash
-
-/etc/init.d/mysqld stop > /dev/null 2>&1
-mysqld_safe --skip-grant-tables --skip-networking > /dev/null 2>&1 & > /dev/null 2>&1
-mysqladmin -u root password "" > /dev/null 2>&1
-/etc/init.d/mysqld restart > /dev/null 2>&1
-mysql -u root -e "update mysql.user set password=password('$1') where user='root'"
-mysql -u root -e "flush privileges"
