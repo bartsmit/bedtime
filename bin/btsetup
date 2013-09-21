@@ -107,6 +107,7 @@ if ((-e "/etc/sysconfig/network-scripts/ifcfg-$myif") &&
    print CFG "PREFIX=$mask\n";
    print CFG "GATEWAY=$mydg\n";
    print CFG "NM_CONTROLLED=no\n";
+   print CFG "IPV6=yes\n";
    close CFG;
 } elsif ((-e "/etc/network/interfaces") &&
    (`grep $myip /etc/network/interfaces | wc -l` == 0)) {
