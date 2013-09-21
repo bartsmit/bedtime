@@ -21,6 +21,8 @@ mysql < /usr/share/bedtime/create.sql
 /etc/init.d/httpd start && chkconfig httpd on
 /etc/init.d/squid start && chkconfig squid on
 /etc/init.d/ntpd start && chkconfig ntpd on
+/etc/init.d/messagebus start && chkconfig messagebus on
+/etc/init.d/avahi-daemon start && chkconfig avahi-daemon on
 
 touch /usr/share/bedtime/network
 chown apache.root /usr/share/bedtime/network
