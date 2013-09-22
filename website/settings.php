@@ -35,7 +35,8 @@ if (isset($_GET['we_start'])) {
 if ($pass_set) {
    header("Location: index.php");
 }
-echo "<html><head><title>Settings</title></head><body><h1>Parents and Settings</h1>\n";
+echo "<html><head><title>Settings</title>\n";
+echo "<link rel=\"stylesheet\" type=\"text/css\" href=\"desktop.css\"></head><body><h1>Parents and Settings</h1>\n";
 echo "<h2>Parents</h2>\n";
 echo "<form name=\"settings\"><table borders=\"0\">\n";
 echo "<th>Name</th><th>Description</th><th>Password</th><th>Delete</th>\n";

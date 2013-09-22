@@ -28,7 +28,8 @@ if (($name != '') && ($copy == 'copy') && ($orig != '')) {
    $mysqli->query("delete from rules where user_id=$gone");
    header("Location: index.php");
 } else {
-   echo "<html><head><title>Add a child</title></head><body>\n";
+   echo "<html><head><title>Add a child</title>\n";
+   echo "<link rel=\"stylesheet\" type=\"text/css\" href=\"desktop.css\"></head><body>\n";
    echo "<h1>Add/Remove a Child</h1><h2>Add</h2>";
    echo "<form name=\"addchild\">\n";
    $res = $mysqli->query("select user_id,name from child order by name");

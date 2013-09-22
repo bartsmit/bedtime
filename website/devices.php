@@ -31,7 +31,8 @@ if ($numrows > 0) {
 } else {
    header("Location: addchild.php");
 }
-echo "<html><head><title>Manage Devices</title></head><body><h1>Devices</h1>\n";
+echo "<html><head><title>Manage Devices</title>\n";
+echo "<link rel=\"stylesheet\" type=\"text/css\" href=\"desktop.css\"></head><body><h1>Devices</h1>\n";
 echo "Assign a child to each device from the drop-down list. Delete devices that are no longer around<br>\n";
 $sql  = "select inet_ntoa(ip) as ip,
          (select name from child where device.user_id = child.user_id) as owner,

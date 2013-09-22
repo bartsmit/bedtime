@@ -28,7 +28,7 @@ sub dbconn {
    my $user = $vals{'dbuser'};
    my $pass = $vals{'dbpass'};
    my $dbis = "DBI:mysql:".$vals{'dbname'}.":".$vals{'dbhost'};
-   DBI->connect($dbis,$user,$pass) or die "Cannot connect to database $dbis with user $user - $!\n";
+   DBI->connect($dbis,$user,$pass) or die "Cannot connect to database $dbis with user $user and password $pass - $!\n";
 }
 
 sub get_val {

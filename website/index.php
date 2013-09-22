@@ -88,7 +88,9 @@ if ($rewi != '') {
    $mysqli->query($sql);
 }
 ?>
-<html><head><title>Bedtime</title></head><body>
+<html><head><title>Bedtime</title>
+<link rel="stylesheet" type="text/css" href="desktop.css">
+</head><body>
 <h1>Bedtime</h1>
 <h2><a href="addchild.php">Add/remove a child</a></h2>
 <hr>
