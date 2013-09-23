@@ -107,7 +107,7 @@ if ((-e "/etc/sysconfig/network-scripts/ifcfg-$myif") &&
    print CFG "PREFIX=$mask\n";
    print CFG "GATEWAY=$mydg\n";
    print CFG "NM_CONTROLLED=no\n";
-   print CFG "IPV6=yes\n";
+   print CFG "IPV6INIT=yes\n";
    close CFG;
 } elsif ((-e "/etc/network/interfaces") &&
    (`grep $myip /etc/network/interfaces | wc -l` == 0)) {
@@ -115,8 +115,17 @@ if ((-e "/etc/sysconfig/network-scripts/ifcfg-$myif") &&
    open (CFG,">/etc/network/interfaces");
    print CFG "auto lo\niface lo inet loopback\n";
    print CFG "auto $myif\n";
+   print CFG "iface $myif inet6 auto\n";
+   print CFG "pre-up modprobe ipv6\n";
    print CFG "iface $myif inet static\naddress $myip\n";
    print CFG "netmask $netmask\ngateway $mydg\n";
+   print CFG "iface $myif inet6 auto\n";
+   close CFG;
+}
+if ((-e "/etc/sysconfig/network") &&
+   (`grep NETWORKING_IPV6 /etc/sysconfig/network | wc -l` == 0)) {
+   open (CFG,">>/etc/sysconfig/network");
+   print CFG "NETWORKING_IPV6=yes";
    close CFG;
 }
 # And restart the network
@@ -173,9 +182,12 @@ if ((-e "/etc/dhcp/dhcpd.conf") &&
    (`grep $network /etc/dhcp/dhcpd.conf | wc -l` == 0)) {
    system("cp -f /etc/dhcp/dhcpd.conf /etc/dhcp/dhcpd.conf.bak");
    open (CFG,">/etc/dhcp/dhcpd.conf");
-   print CFG "subnet $network netmask $netmask {\n";
+   print CFG "default-lease-time 600;\n";
+   print CFG "max-lease-time 7200;\n";
+   print CFG "option subnet-mask $netmask;\n";
    print CFG "option routers $myip;\n";
    print CFG "option domain-name-servers $dns_servers\n";
+   print CFG "subnet $network netmask $netmask {\n";
    print CFG $ranges;
    print CFG "}\n";
    close CFG;

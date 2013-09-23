@@ -21,14 +21,20 @@ sub dbconn {
    foreach (@conf) {
       chomp;
       my @pair = split(/\s*=\s*/);
-      $vals{$pair[0]}=$pair[1];
+      $vals{trim($pair[0])}=trim($pair[1]);
    }
-
    # Collect the credentials and connect to the database
    my $user = $vals{'dbuser'};
    my $pass = $vals{'dbpass'};
    my $dbis = "DBI:mysql:".$vals{'dbname'}.":".$vals{'dbhost'};
    DBI->connect($dbis,$user,$pass) or die "Cannot connect to database $dbis with user $user and password $pass - $!\n";
+}
+
+sub trim {
+   my $str = shift;
+   $str =~ s/^\s+//;
+   $str =~ s/\s+$//;
+   $str;
 }
 
 sub get_val {
