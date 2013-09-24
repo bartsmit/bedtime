@@ -4,7 +4,6 @@ BEGIN {push @INC,'/usr/share/bedtime/bin'}
 
 use BedtimeDB qw(get_val);
 use DBI;
-use Data::Dump qw(dump);
 use strict;
 use warnings;
 

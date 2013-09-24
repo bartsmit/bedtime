@@ -5,7 +5,6 @@ BEGIN {push @INC,'/usr/share/bedtime/bin'}
 use warnings;
 use strict;
 use BedtimeDB qw(get_val set_val long2ip ip2long);
-use Data::Dump qw(dump);
 
 my $pass = $ARGV[0];
 my $conf = '';
