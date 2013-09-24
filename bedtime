@@ -19,7 +19,7 @@
 #              on their behalf.
 ### END INIT INFO
 
-PROG=/usr/local/bin/bedtimed
+PROG=/usr/share/bedtime/bin/bedtimed
 NAME=bedtimed
 PIDF=/var/run/bedtimed.pid
 
