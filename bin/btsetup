@@ -182,6 +182,7 @@ if ((-e "/etc/dhcp/dhcpd.conf") &&
    (`grep $network /etc/dhcp/dhcpd.conf | wc -l` == 0)) {
    system("cp -f /etc/dhcp/dhcpd.conf /etc/dhcp/dhcpd.conf.bak");
    open (CFG,">/etc/dhcp/dhcpd.conf");
+   print CFG "authoritative\n";
    print CFG "default-lease-time 600;\n";
    print CFG "max-lease-time 7200;\n";
    print CFG "option subnet-mask $netmask;\n";

@@ -8,6 +8,7 @@ setsebool -P httpd_can_network_connect 1
 iptables -I INPUT 4 -m state --state NEW -p tcp -m tcp --dport 80 -j ACCEPT
 iptables -I INPUT 4 -m state --state NEW -p tcp -m tcp --dport 3128 -j ACCEPT
 iptables -I INPUT 4 -m state --state NEW -p udp -m udp --dport 5353 -j ACCEPT
+iptables -I INPUT 4 -m state --stete NEW -p udp -m udp --dport 67:68 -j ACCEPT
 /etc/init.d/iptables save
 
 ip6tables -I INPUT 4 -m state --state NEW -p tcp -m tcp --dport 80 -j ACCEPT
