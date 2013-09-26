@@ -35,6 +35,10 @@ while ( my $client = $socket->accept() ) {
    system("/usr/share/bedtime/bin/dhcp_slurp") if $input =~ /^d/;
    system("/usr/share/bedtime/bin/get_manlst") if $input =~ /^m/;
    system("/usr/share/bedtime/bin/survey_net") if $input =~ /^s/;
+   if ($input =~ /^s/) {
+      my $myip =~ s/^s//;
+      system("/usr/share/bedtime/bin/survey_net $myip")
+   }
    if ($input =~ /^p/) {
       my $pass =~ s/^p//;
       system("/usr/share/bedtime/bin/btsetup $pass");

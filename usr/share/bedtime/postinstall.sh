@@ -31,7 +31,3 @@ cp /usr/share/bedtime/squid.conf /etc/squid
 cp /usr/share/bedtime/bedtime /etc/init.d
 chmod 755 /etc/init.d/bedtime
 /etc/init.d/bedtime start && chkconfig bedtime on
-
-touch /usr/share/bedtime/network
-chown apache.root /usr/share/bedtime/network
-chmod 640 /usr/share/bedtime/network
