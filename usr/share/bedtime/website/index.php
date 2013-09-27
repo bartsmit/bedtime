@@ -1,4 +1,5 @@
 <?php
+session_start(); if (!isset($_SESSION["name"])) { header("location:login.html"); }
 include "dbconn.php";
 $sall = (isset($_GET['sel_all']));
 $awst = (isset($_GET['a_w_start']))   ? $_GET['a_w_start']   : '';
@@ -162,5 +163,6 @@ foreach ($children as $id => $name) {
 <hr>
 <input type="submit" value="submit">
 </form><br>
-Cancel and <a href="index.php">reset</a>
+Cancel and <a href="index.php">reset</a><br>
+Or <a href="logout.html">log out</a> of Bedtime
 </body></html>

@@ -1,4 +1,5 @@
 <?php
+session_start(); if (!isset($_SESSION["name"])) { header("location:login.html"); }
 include "dbconn.php";
 $res = $mysqli->query("select parent_id from parent");
 $kill = '';
@@ -72,5 +73,5 @@ echo "</select><hr>";
 ?>
 <input type="submit" value="submit">
 </form>
-<a href="index.php">return</a>
-</body></html>
+<a href="index.php">return</a><br>
+Or <a href="logout.html">log out</a> of Bedtime</body></html>

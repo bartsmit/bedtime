@@ -5,6 +5,7 @@ padding: 1px 5px;
 }
 </style>
 <?php
+session_start(); if (!isset($_SESSION["name"])) { header("location:login.html"); }
 include "dbconn.php";
 
 $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
@@ -82,5 +83,5 @@ Press submit to update devices.
 <input type="checkbox" name="manlst"> also update manufacturers list (may take a minute)<br><hr>
 <input type="submit" value="submit">
 </form>
-<a href="index.php">return</a>
-</body></html>
+<a href="index.php">return</a><br>
+Or <a href="logout.html">log out</a> of Bedtime</body></html>

@@ -1,4 +1,5 @@
 <?php
+session_start(); if (!isset($_SESSION["name"])) { header("location:login.html"); }
 include "dbconn.php";
 $name = (isset($_GET['name']))      ? $_GET['name']      : '';
 $desc = (isset($_GET['desc']))      ? $_GET['desc']      : '';
@@ -76,5 +77,5 @@ foreach ($children as $id => $name) {
 </select> Is responsible enough to switch off their devices for bed. Remove them from bedtime.<br><br><hr>
 <input type="submit" value="submit">
 </form>
-<br>Cancel and <a href="index.php">return</a>
-</body></html>
+<br>Cancel and <a href="index.php">return</a><br>
+Or <a href="logout.html">log out</a> of Bedtime</body></html>
