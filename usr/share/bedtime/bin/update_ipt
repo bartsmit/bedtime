@@ -272,7 +272,7 @@ $tables .= "iptables -I FORWARD 1 -m mac --mac-source $_ -j REJECT\n" foreach (@
 system($tables);
 
 # Save the new iptables in the boot script
-system("/etc/init.d/iptables save");
+system("/etc/init.d/iptables save > /dev/null");
 
 
 ### Subroutines ###

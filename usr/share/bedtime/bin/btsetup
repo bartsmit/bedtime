@@ -11,9 +11,10 @@ my $conf = '';
 
 # See if we have a valid password
 if (length($pass) < 1) {
-   system("logger btsetup was called with an empty password");
+   `logger btsetup was called with an empty password`;
 } else {
    # Read the conf file into an array
+   `logger btsetup was called with password $pass`;
    open (CONF, "/etc/bedtime.conf");
    my @lines = <CONF>;
    close CONF;
@@ -190,6 +191,10 @@ if (-e "/etc/init.d/dhcpd") {
 } elsif (-e  "/etc/init.d/networking") {
    system("/etc/init.d/networking restart");
 }
+
+# Find the leases file
+my $leases = `find /var -name dhcpd*.leases | grep -v 6`;
+set_val('dhcp_leases',$leases);
 
 # Enable routing
 open (CONF, "/etc/sysctl.conf");
