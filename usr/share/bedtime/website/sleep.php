@@ -10,5 +10,5 @@ $myip = $res['value'];
 <meta http-equiv="expires" content="Tue, 01 Jan 1980 1:00:00 GMT" />
 <meta http-equiv="pragma" content="no-cache" />
 </head><body>
-<img src="http://<?php echo $myip; ?>/bedtime/sleep.png">
+<img src="http://<?php echo $myip; ?>/bedtime/sleep.jpg">
 </body>
