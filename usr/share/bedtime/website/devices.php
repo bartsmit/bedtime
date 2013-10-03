@@ -40,6 +40,9 @@ $sql  = "select inet_ntoa(ip) as ip,
          (select short from manufacturers where
             (manufacturers.mac & x'FFFFFF000000') = (device.mac & x'FFFFFF000000') or
             (manufacturers.mac & x'FFFFFFFFF000') = (device.mac & x'FFFFFFFFF000')) as vendor,
+         (select description from manufacturers where
+            (manufacturers.mac & x'FFFFFF000000') = (device.mac & x'FFFFFF000000') or
+            (manufacturers.mac & x'FFFFFFFFF000') = (device.mac & x'FFFFFFFFF000')) as label,
          lpad(hex(mac),12,'0') as mac,
          first_seen as first,
          user_id as id from device;";
@@ -53,6 +56,7 @@ while($obj = $res->fetch_object()) {
    $mac    = $obj->mac;
    $ip     = $obj->ip;
    $vendor = $obj->vendor;
+   $label  = $obj->label;
    $first  = $obj->first;
    $newid  = (isset($_GET["o_$mac"])) ? $_GET["o_$mac"] : '0';
    $remove = (isset($_GET["d_$mac"])) ? $_GET["d_$mac"] : '';
@@ -69,7 +73,7 @@ while($obj = $res->fetch_object()) {
          echo ">$name</option>\n";
       }
       $dis_mac = rtrim(strtolower(chunk_split($mac,2,'-')),'-');
-      echo "</select></td><td>$vendor</td><td>$dis_mac</td><td>$ip</td><td>$first</td>\n";
+      echo "</select></td><td><div title=\"$label\">$vendor</div></td><td>$dis_mac</td><td>$ip</td><td>$first</td>\n";
       echo "<td><input type=\"checkbox\" name=\"d_$mac\" value=\"d_$mac\"></td></tr>\n";
    } else {
       $kill_list .= "x'$mac',";

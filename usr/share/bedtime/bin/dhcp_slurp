@@ -13,20 +13,35 @@ my $lease_f = &BedtimeDB::get_val('dhcp_leases');
 open (LEASE,$lease_f);
 my @lease = <LEASE>; close(LEASE);
 
-# Filter out lines starting with lease or hardware
-my @devs = grep { $_ =~ /^\s*lease|^\s*hardware/} @lease;
-my $devs = join("", @devs);
+# Make lease array one long string and split on lease
+my @devs = split(/lease\s+/,join("\n",@lease));
 
-# Replace newlines with a ### marker
-$devs =~ s/\s*{\s*\n\s*/###/g;
-$devs =~ s/\s*lease\s*|\s*hardware ethernet\s*//g;
-$devs =~ s/;/\n/g;
-chomp($devs);
-my @devs = split(/\n/,$devs);
-foreach (@devs) {
-   my @row = split(/###/);
-   my $ip = $row[0]; my $mac = $row[1];
-   $mac =~ s/://g; $mac = uc($mac);
+# Get the devices from the database
+my %devices;
+my $sth = $dbh->prepare("select lpad(hex(mac),12,'0') as mac, inet_ntoa(ip) as ip from device");
+$sth->execute;
+while (my @row = $sth->fetchrow_array) {
+   my ($mac,$ip) = (@row);
+   $devices{$mac} = $ip unless exists($devices{$mac});
+}
+
+# See if there are any new devices
+my %new;
+foreach my $dev (@devs) {
+   # only work on leases with a MAC in them
+   if ($dev =~ m/hardware ethernet ([0-9a-fA-F]{2}:){5}([0-9a-fA-F]{2})/) {
+      my $mac = $&;
+      $mac =~ s/hardware ethernet\s+//;
+      $mac =~ s/://g; $mac = uc($mac);
+      # Find the IP
+      $dev =~ m/^(\d{1,3}\.){3}(\d{1,3})/;
+      my $ip = $&;
+      # Add to the new hash if not in the database
+      $new{$mac} = $ip unless exists($devices{$mac});
+   }
+}
+
+while ((my $mac, my $ip)=each(%new)) {
    my $sth = $dbh->prepare("select count(*) from device where lpad(hex(mac),12,'0')=lpad('$mac',12,'0');") or die "Cannot prepare query: $dbh->errstr";
    my $res = $sth->execute or die "Cannot execute query: $sth->errstr";
    my $sql;
@@ -39,4 +54,3 @@ foreach (@devs) {
    $sth = $dbh->prepare($sql) or die "Cannot prepare query: $dbh->errstr";
    $res = $sth->execute or die "Cannot execute query: $sth->errstr";
 }
-$dbh->disconnect;
