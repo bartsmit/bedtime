@@ -6,18 +6,32 @@ cp -f /usr/share/bedtime/iptables-config /etc/sysconfig
 cp -f /usr/share/bedtime/ip6tables-config /etc/sysconfig
 
 iptables -F FORWARD
-iptables -I INPUT 4 -m state --state NEW -p tcp -m tcp --dport 80 -j ACCEPT
-iptables -I INPUT 4 -m state --state NEW -p tcp -m tcp --dport 3128 -j ACCEPT
-iptables -I INPUT 4 -m state --state NEW -p udp -m udp --dport 5353 -j ACCEPT
-iptables -I INPUT 4 -m state --state NEW -p udp -m udp --dport 67:68 -j ACCEPT
+iptables -X FORWARD
+iptables -F OUTPUT
+iptables -X OUTPUT
+iptables -F INPUT
+iptables -X INPUT
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A INPUT -p icmp -j ACCEPT
+iptables -A INPUT -m conntrack --ctstate NEW -p tcp -m tcp --dport 22 -j ACCEPT
+iptables -A INPUT -m conntrack --ctstate NEW -p tcp -m tcp --dport 80 -j ACCEPT
+iptables -A INPUT -m conntrack --ctstate NEW -p tcp -m tcp --dport 3128 -j ACCEPT
+iptables -A INPUT -m conntrack --ctstate NEW -p udp -m udp --dport 5353 -j ACCEPT
+iptables -A INPUT -m conntrack --ctstate NEW -p udp -m udp --dport 67:68 -j ACCEPT
 iptables-save > /etc/sysconfig/iptables
 
-ip6tables -I INPUT 4 -m state --state NEW -p tcp -m tcp --dport 80 -j ACCEPT
-ip6tables -I INPUT 4 -m state --state NEW -p tcp -m tcp --dport 3128 -j ACCEPT
-ip6tables -I INPUT 4 -m state --state NEW -p udp -m udp --dport 5353 -j ACCEPT
+ip6tables -F FORWARD
+ip6tables -X FORWARD
+ip6tables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+ip6tables -A INPUT -i lo -j ACCEPT
+ip6tables -A INPUT -p ipv6-icmp -j ACCEPT
+ip6tables -A INPUT -m conntrack --ctstate NEW -p tcp -m tcp --dport 80 -j ACCEPT
+ip6tables -A INPUT -m conntrack --ctstate NEW -p tcp -m tcp --dport 3128 -j ACCEPT
+ip6tables -A INPUT -m conntrack --ctstate NEW -p udp -m udp --dport 5353 -j ACCEPT
 ip6tables-save > /etc/sysconfig/ip6tables
 
-/usr/share/bedtime/bin/squidconf
+/usr/share/bedtime/bin/setconfs
 
 if hash systemctl 2>/dev/null; then
    cp /usr/share/bedtime/bedtime.service /lib/systemd/system/
@@ -25,7 +39,8 @@ if hash systemctl 2>/dev/null; then
    systemctl start mysqld.service || systemctl enable mysqld.service
    systemctl start squid.service || systemctl enable squid.service
    systemctl start ntpd.service || systemctl enable ntpd.service
-   systemctl start httpd.service || systemctl enable httpd.service
+   apachectl start || systemctl enable httpd.service
+   systemctl unmask avahi-daemon
    systemctl start avahi-daemon.service || systemctl enable avahi-daemon.service
    systemctl start bedtime.service || systemctl enable bedtime.service
 else
