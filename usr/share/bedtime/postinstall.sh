@@ -38,29 +38,44 @@ ip6tables-save > /etc/sysconfig/ip6tables
 if hash systemctl 2>/dev/null; then
    cp /usr/share/bedtime/bedtime.service /lib/systemd/system/
    systemctl daemon-reload
-   systemctl start mysqld.service || systemctl enable mysqld.service
-   systemctl start squid.service || systemctl enable squid.service
-   systemctl start ntpd.service || systemctl enable ntpd.service
-   systemctl start iptables.service || systemctl enable iptables.service
+   systemctl start mysqld.service
+   systemctl enable mysqld.service
+   systemctl start squid.service
+   systemctl enable squid.service
+   systemctl start ntpd.service
+   systemctl enable ntpd.service
+   systemctl start iptables.service
+   systemctl enable iptables.service
    systemctl unmask ip6tables.service
-   systemctl start ip6tables.service || systemctl enable ip6tables.service
-   apachectl start || systemctl enable httpd.service
+   systemctl start ip6tables.service
+   systemctl enable ip6tables.service
+   apachectl start
+   systemctl enable httpd.service
    systemctl unmask avahi-daemon.socket
    systemctl unmask avahi-daemon.service
-   systemctl start avahi-daemon.service || systemctl enable avahi-daemon.service
-   systemctl start bedtime.service || systemctl enable bedtime.service
+   systemctl start avahi-daemon.service
+   systemctl enable avahi-daemon.service
+   systemctl start bedtime.service
+   systemctl enable bedtime.service
 else
-   /etc/init.d/mysqld start || chkconfig mysqld on
-   /etc/init.d/squid start || chkconfig squid on
+   /etc/init.d/mysqld start
+   chkconfig mysqld on
+   /etc/init.d/squid start
+   chkconfig squid on
    /etc/init.d/ntpd stop
    ntpdate 0.pool.ntp.org.
-   /etc/init.d/ntpd start || chkconfig ntpd on
-   /etc/init.d/httpd start || chkconfig httpd on
-   /etc/init.d/messagebus start || chkconfig messagebus on
-   /etc/init.d/avahi-daemon start || chkconfig avahi-daemon on
+   /etc/init.d/ntpd start
+   chkconfig ntpd on
+   /etc/init.d/httpd start
+   chkconfig httpd on
+   /etc/init.d/messagebus start
+   chkconfig messagebus on
+   /etc/init.d/avahi-daemon start
+   chkconfig avahi-daemon on
    cp /usr/share/bedtime/bedtime /etc/init.d
    chmod 755 /etc/init.d/bedtime
-   /etc/init.d/bedtime start || chkconfig bedtime on
+   /etc/init.d/bedtime start
+   chkconfig bedtime on
 fi
 
 mysql < /usr/share/bedtime/create.sql
