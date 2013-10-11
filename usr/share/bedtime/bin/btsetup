@@ -31,22 +31,6 @@ if (length($pass) < 1) {
    # Write it back to the conf file
    open (CONF,">/etc/bedtime.conf");
    print CONF "$conf";
-
-   # Do the same for the apache conf file
-   $conf = '';
-   open (CONF, "/etc/httpd/conf.d/bedtime.conf");
-   @lines = <CONF>;
-   foreach my $line (@lines) {
-      if ($line =~ m/AuthMySQLPassword /) {
-         $conf .= "$`$&$pass\n";
-      } else {
-         $conf .= $line;
-      }
-   }
-   open (CONF,">/etc/httpd/conf.d/bedtime.conf");
-   print CONF "$conf";
-   close CONF;
-   my $cmd = `apachectl restart`;
 } 
 
 # Survey the network stack
@@ -79,6 +63,7 @@ set_val('dhcp',$dhcp);
 set_val('mask',$mask);
 set_val('myif',$myif);
 ;
+
 # Change prefix to netmask
 my $nm_num;
 for(my $i=0;$i<$mask;$i++) {
@@ -170,7 +155,7 @@ if ((-e "/etc/dhcp/dhcpd.conf") &&
    (`grep $network /etc/dhcp/dhcpd.conf | wc -l` == 0)) {
    `cp -f /etc/dhcp/dhcpd.conf /etc/dhcp/dhcpd.conf.bak`;
    open (CFG,">/etc/dhcp/dhcpd.conf");
-   $conf  = "authoritative;\ndefault-lease-time 600;\nmax-lease-time 7200;\n";
+   $conf  = "authoritative;\ndefault-lease-time 3600;\nmax-lease-time 14400;\n";
    $conf .= "option subnet-mask $netmask;\noption routers $myip;\n";
    $conf .= "option domain-name-servers $dns_servers\n";
    $conf .= "subnet $network netmask $netmask {\n$ranges}\n";
@@ -207,14 +192,18 @@ close CONF;
 $conf = '';
 
 # Look for the sysctl line
+my $find = 0;
 foreach my $line (@lines) {
    if ($line =~ m/net\.ipv4\.ip_forward/) {
       # Replace with 1
       $conf .= "$`$& = 1\n";
+      $find = 1;
    } else {
       $conf .= $line;
    }
 }
+$conf .= "net.ipv4.ip_forward = 1\n" unless $find;
+
 open (CONF, ">/etc/sysctl.conf");
 print CONF $conf;
 close CONF;

@@ -19,6 +19,7 @@ iptables -A INPUT -m conntrack --ctstate NEW -p tcp -m tcp --dport 80 -j ACCEPT
 iptables -A INPUT -m conntrack --ctstate NEW -p tcp -m tcp --dport 3128 -j ACCEPT
 iptables -A INPUT -m conntrack --ctstate NEW -p udp -m udp --dport 5353 -j ACCEPT
 iptables -A INPUT -m conntrack --ctstate NEW -p udp -m udp --dport 67:68 -j ACCEPT
+iptables -A INPUT -j REJECT --reject-with icmp-host-prohibited
 iptables-save > /etc/sysconfig/iptables
 
 ip6tables -F FORWARD
@@ -29,6 +30,7 @@ ip6tables -A INPUT -p ipv6-icmp -j ACCEPT
 ip6tables -A INPUT -m conntrack --ctstate NEW -p tcp -m tcp --dport 80 -j ACCEPT
 ip6tables -A INPUT -m conntrack --ctstate NEW -p tcp -m tcp --dport 3128 -j ACCEPT
 ip6tables -A INPUT -m conntrack --ctstate NEW -p udp -m udp --dport 5353 -j ACCEPT
+ip6tables -A INPUT -j REJECT --reject-with icmp6-adm-prohibited
 ip6tables-save > /etc/sysconfig/ip6tables
 
 /usr/share/bedtime/bin/setconfs
@@ -39,8 +41,12 @@ if hash systemctl 2>/dev/null; then
    systemctl start mysqld.service || systemctl enable mysqld.service
    systemctl start squid.service || systemctl enable squid.service
    systemctl start ntpd.service || systemctl enable ntpd.service
+   systemctl start iptables.service || systemctl enable iptables.service
+   systemctl unmask ip6tables.service
+   systemctl start ip6tables.service || systemctl enable ip6tables.service
    apachectl start || systemctl enable httpd.service
-   systemctl unmask avahi-daemon
+   systemctl unmask avahi-daemon.socket
+   systemctl unmask avahi-daemon.service
    systemctl start avahi-daemon.service || systemctl enable avahi-daemon.service
    systemctl start bedtime.service || systemctl enable bedtime.service
 else
