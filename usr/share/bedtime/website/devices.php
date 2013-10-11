@@ -58,15 +58,16 @@ while($obj = $res->fetch_object()) {
    $vendor = $obj->vendor;
    $label  = $obj->label;
    $first  = $obj->first;
-   $newid  = (isset($_GET["o_$mac"])) ? $_GET["o_$mac"] : '0';
+   $newid  = (isset($_GET["o_$mac"])) ? $_GET["o_$mac"] : '';
    $remove = (isset($_GET["d_$mac"])) ? $_GET["d_$mac"] : '';
-   if (($newid <> '0') && ($newid <> $did)) {
+   if (($newid <> '') && ($newid <> $did)) {
       # The new owner is non-zero and different from the one in the database
       $mysqli->query("update device set user_id=$newid where lpad(hex(mac),12,'0') = '$mac'");
       $did = $newid;
    }
    if ($remove == '') {
       echo "<tr><td><select name=\"o_$mac\">\n";
+      echo "<option value=\"0\"> </option>\n";
       foreach ($children as $id => $name) {
          echo "<option value=\"$id\""; 
          if ($did == $id) { echo " selected"; }

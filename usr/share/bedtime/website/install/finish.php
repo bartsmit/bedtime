@@ -5,7 +5,11 @@ foreach ($net as $line) {
    if ($bits[1] === "dhcp") {
       $dhcp = $bits[0];
    }
+   if ($bits[1] === "dg") {
+      $dg = $bits[0];
+  }
 }
+if ((!isset($dhcp)) or ($dhcp === "")) { $dhcp = $dg; }
 print "<html><title>Finish Install</title><body>\n";
 print "Congratulations, Bedtime is set up.<br><br>Next, you will need to disable the DHCP server<br>\n";
 print "Click <a href=\"http://$dhcp\" target=\"_blank\">here</a> to manage your router in a new tab/window<br><br>\n";
