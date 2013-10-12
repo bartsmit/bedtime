@@ -53,3 +53,20 @@ foreach my $line (@lines) {
 # Write the new apache conf file
 open (CONF, ">/etc/httpd/conf/httpd.conf");
 print CONF "$conf"; close CONF;
+
+# We need explicit allow for apache 2.4
+$conf = '';
+my $ver = `httpd -v | grep version`;
+$ver =~ m/Apache\/\d+\.\d+/;
+$ver =~ s/Apache\///;
+# If we are on 2.4 and allow not already set
+if (($ver == "2.4") &&
+    (`grep 'Require all granted' /etc/httpd/conf.d/bedtime.conf | wc -l` == 0)) {
+   # Add the allow lines
+   $conf .= '<Directory "/usr/share/bedtime/website">';
+   $conf .= "\nRequire all granted\n</Directory>\n";
+}
+# Last line is the alias
+$conf .= "Alias /bedtime /usr/share/bedtime/website\n";
+open (CONF, ">/etc/httpd/conf.d/bedtime.conf");
+print CONF "$conf"; close CONF;
