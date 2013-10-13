@@ -55,6 +55,7 @@ if hash systemctl 2>/dev/null; then
    systemctl unmask avahi-daemon.service
    systemctl start avahi-daemon.service
    systemctl enable avahi-daemon.service
+   systemctl enable dhcpd.service
    systemctl start bedtime.service
    systemctl enable bedtime.service
 else
@@ -72,6 +73,7 @@ else
    chkconfig messagebus on
    /etc/init.d/avahi-daemon start
    chkconfig avahi-daemon on
+   chkconfig dhcpd on
    cp /usr/share/bedtime/bedtime /etc/init.d
    chmod 755 /etc/init.d/bedtime
    /etc/init.d/bedtime start
