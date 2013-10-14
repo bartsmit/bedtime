@@ -40,7 +40,7 @@ sub trim {
 sub get_val {
    my $var = shift;
    my $dbh = &dbconn;
-   my $sth = $dbh->prepare("select value from settings where variable='$var';") or die "Cannot prepare query: $dbh->errstr";
+   my $sth = $dbh->prepare("select value from bedtime.settings where variable='$var';") or die "Cannot prepare query: $dbh->errstr";
    my $res = $sth->execute or die "Cannot execute query: $sth->errstr";
    $sth->fetchrow_array();
 }
@@ -48,7 +48,7 @@ sub get_val {
 sub set_val {
    my ($var,$val) = @_;
    my $dbh = &dbconn;
-   my $sth = $dbh->prepare("replace into settings (variable,value) values('$var','$val')") or die "Cannot prepare query: $dbh->errstr";
+   my $sth = $dbh->prepare("replace into bedtime.settings (variable,value) values('$var','$val')") or die "Cannot prepare query: $dbh->errstr";
    my $res = $sth->execute or die "Cannot execute query: $sth->errstr";
 }
 

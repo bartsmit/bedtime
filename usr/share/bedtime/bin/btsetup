@@ -33,10 +33,7 @@ if (length($pass) < 1) {
    print CONF "$conf";
 } 
 
-# Survey the network stack
-`/usr/share/bedtime/bin/survey_net`;
-
-# Use the results
+# Use the survey results
 open (NET, "/usr/share/bedtime/network");
 my ($myip,$mydg,$dhcp,$mask,$myif);
 foreach (<NET>) {
@@ -62,7 +59,7 @@ set_val('mydg',$mydg);
 set_val('dhcp',$dhcp);
 set_val('mask',$mask);
 set_val('myif',$myif);
-;
+
 
 # Change prefix to netmask
 my $nm_num;
