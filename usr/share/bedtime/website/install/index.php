@@ -8,6 +8,9 @@ if (filesize("/usr/share/bedtime/network") < 7) {
    $result = socket_connect($sock,'127.0.0.1',5000);
    $buf = "s$myip\n";
    socket_write($sock,$buf,strlen($buf));
+   while (filesize("/usr/share/bedtime/network") < 7) {
+      sleep(1);
+   }
 }
 if (isset($_GET['sqlrootpw'])) {
    $rootpass = $_GET['sqlrootpw'];

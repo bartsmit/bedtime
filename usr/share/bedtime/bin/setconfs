@@ -56,11 +56,8 @@ print CONF "$conf"; close CONF;
 
 # We need explicit allow for apache 2.4
 $conf = '';
-my $ver = `httpd -v | grep version`;
-$ver =~ m/Apache\/\d+\.\d+/;
-$ver =~ s/Apache\///;
 # If we are on 2.4 and allow not already set
-if (($ver == "2.4") &&
+if ((`httpd -v | grep Apache/2.4 | wc -l` > 0) &&
     (`grep 'Require all granted' /etc/httpd/conf.d/bedtime.conf | wc -l` == 0)) {
    # Add the allow lines
    $conf .= '<Directory "/usr/share/bedtime/website">';
