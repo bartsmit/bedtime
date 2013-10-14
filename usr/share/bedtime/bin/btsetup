@@ -30,7 +30,7 @@ if (length($pass) < 1) {
    } 
    # Write it back to the conf file
    open (CONF,">/etc/bedtime.conf");
-   print CONF "$conf";
+   print CONF "$conf"; close CONF;
 } 
 
 # Use the survey results
@@ -165,7 +165,7 @@ if (-e "/etc/init.d/network") {
    system("/etc/init.d/network restart");
 } elsif (-e "/etc/init.d/networking") {
    system("/etc/init.d/networking restart");
-} elsif (`hash systemctl` == '') {
+} elsif (`hash systemctl` eq '') {
    system("systemctl restart network.service");
 }
 
@@ -174,7 +174,7 @@ if (-e "/etc/init.d/dhcpd") {
    system("/etc/init.d/dhcpd restart");
 } elsif (-e  "/etc/init.d/networking") {
    system("/etc/init.d/networking restart");
-} elsif (`hash systemctl` == '') {
+} elsif (`hash systemctl` eq '') {
    system("systemctl restart dhcpd.service");
 }
 
