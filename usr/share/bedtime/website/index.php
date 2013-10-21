@@ -1,5 +1,5 @@
 <?php
-session_start(); if (!isset($_SESSION["name"])) { header("location:login.html"); }
+session_start(); if (!isset($_SESSION["name"])) { header("location:login.php"); }
 include "dbconn.php";
 $sall = (isset($_GET['sel_all']));
 $awst = (isset($_GET['a_w_start']))   ? $_GET['a_w_start']   : '';
@@ -88,11 +88,13 @@ if ($rewi != '') {
    }
    $mysqli->query($sql);
 }
+$res = squery("select value from settings where variable='myip'",$mysqli);
+$myip = $res['value'];
 ?>
 <html><head><title>Bedtime</title>
 <link rel="stylesheet" type="text/css" href="desktop.css">
 </head><body>
-<h1>Bedtime</h1>
+<h1>Bedtime on http://<?php echo $myip?></h1>
 <h2><a href="addchild.php">Add/remove a child</a></h2>
 <hr>
 <h2>Edit bedtimes</h2>

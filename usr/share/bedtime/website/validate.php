@@ -14,4 +14,4 @@ if (($res->num_rows) == 1) {
 
 <html><head><title>Failed Login</title>
 <link rel="stylesheet" type="text/css" href="desktop.css"></head><body>
-Incorrect login, please <a href="login.html">try again</a></body></html>
+Incorrect login, please <a href="login.php">try again</a></body></html>
