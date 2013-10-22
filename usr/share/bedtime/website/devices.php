@@ -9,14 +9,14 @@ session_start(); if (!isset($_SESSION["name"])) { header("location:login.html");
 include "dbconn.php";
 
 $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
-$result = socket_connect($sock,'127.0.0.1',$btport);
+$result = socket_connect($sock,'127.0.0.1',5000);
 $buf = "d\n";
 socket_write($sock,$buf,strlen($buf));
 
 if (isset($_GET["manlst"])) {
    $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
    $buf = "m\n";
-   $result = socket_connect($sock,'127.0.0.1',$btport);
+   $result = socket_connect($sock,'127.0.0.1',5000);
    socket_write($sock,$buf,strlen($buf));
 }
 

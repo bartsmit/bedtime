@@ -7,7 +7,7 @@ use DBI;
 use strict;
 
 our @ISA = qw( Exporter );
-our @EXPORT_OK = qw(dbconn get_val set_val ip2long long2ip trim);
+our @EXPORT_OK = qw(dbconn get_val set_val ip2long long2ip);
 
 sub dbconn {
    open (CONF,'/etc/bedtime.conf') or die "Cannot open configuration file - $!\n";
