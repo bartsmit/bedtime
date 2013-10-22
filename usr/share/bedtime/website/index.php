@@ -19,7 +19,7 @@ $mysqli->query("delete from ground where end < now()");
 $mysqli->query("delete from reward where end < now()");
 
 $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
-$result = socket_connect($sock,'127.0.0.1',5000);
+$result = socket_connect($sock,'127.0.0.1',$btport);
 $buf = "u\n";
 socket_write($sock,$buf,strlen($buf));
 

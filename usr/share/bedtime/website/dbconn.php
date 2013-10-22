@@ -9,6 +9,7 @@ foreach ($conf as $line) {
 }
 
 $mysqli = new mysqli ($vals["dbhost"], $vals["dbuser"], $vals["dbpass"], $vals["dbname"]);
+$btport = $vals["btport"];
 
 function squery($sql,$mysqli) {
    if ($result = $mysqli->query($sql)) {

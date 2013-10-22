@@ -5,14 +5,30 @@ use warnings;
 use POSIX qw( setsid );
 use IO::Socket;
 
-# Open the socket on TCP 5000
+open (CONF,'/etc/bedtime.conf') or die "Cannot open configuration file - $!\n";
+# Read the conf file into an array and filter out all lines consisting of just white space and comments
+my @conf = <CONF>; close CONF;
+@conf = grep (!/^\s*$/,@conf);
+@conf = grep (!/^#/,@conf);
+
+# Read the remaining lines into a hash split on =
+my %vals;
+foreach (@conf) {
+   chomp;
+   my @pair = split(/\s*=\s*/);
+   $vals{trim($pair[0])}=trim($pair[1]);
+}
+# Get the TCP port number
+my $btport = $vals{'btport'};
+
+# Open the socket on the TCP port from the config
 my $socket = IO::Socket::INET->new(
    'Proto'     => 'tcp',
-   'LocalPort' => 5000,
+   'LocalPort' => $btport,
    'Listen'    => 5,
    'Reuse'     => 1,
 );
-die "Cannot open socket on port 5000: $!" unless ($socket);
+die "Cannot open socket on port $btport: $!" unless ($socket);
 
 # Disconnect from the terminal
 chdir '/' or die "Cannot cd to /: $!";
@@ -31,7 +47,7 @@ close PID;
 # Launch scripts according to socket input
 while ( my $client = $socket->accept() ) {
    chomp ( my $input = <$client> );
-   system("logger socket 5000 received $input");
+   system("logger socket $btport received $input");
    system("/usr/share/bedtime/bin/update_ipt") if $input =~ /^u/;
    system("/usr/share/bedtime/bin/dhcp_slurp") if $input =~ /^d/;
    system("/usr/share/bedtime/bin/get_manlst") if $input =~ /^m/;
