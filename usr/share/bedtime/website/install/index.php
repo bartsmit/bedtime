@@ -28,7 +28,6 @@ if (isset($_GET['sqlrootpw'])) {
             $mysqli->query("delete from mysql.user where user='sleepy'");
             $mysqli->query("grant all on bedtime.* to 'sleepy'@'localhost' identified by '$pass'");
             $mysqli->query("flush privileges");
-            $mysqli->query("replace into bedtime.settings (variable,value) values('dns','".$_GET['dns']."')");
             $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
             $result = socket_connect($sock,'127.0.0.1',$btport);
             $buf = "p$pass\n";

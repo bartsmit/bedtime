@@ -1,5 +1,5 @@
 <?php
-session_start(); if (!isset($_SESSION["name"])) { header("location:login.php"); }
+session_start(); if (!isset($_SESSION["name"])) { header("location:login.html"); }
 include "dbconn.php";
 $name = (isset($_GET['name']))      ? $_GET['name']      : '';
 $desc = (isset($_GET['desc']))      ? $_GET['desc']      : '';

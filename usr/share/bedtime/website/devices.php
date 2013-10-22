@@ -5,7 +5,7 @@ padding: 1px 5px;
 }
 </style>
 <?php
-session_start(); if (!isset($_SESSION["name"])) { header("location:login.php"); }
+session_start(); if (!isset($_SESSION["name"])) { header("location:login.html"); }
 include "dbconn.php";
 
 $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);

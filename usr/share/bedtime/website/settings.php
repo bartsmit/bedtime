@@ -1,5 +1,5 @@
 <?php
-session_start(); if (!isset($_SESSION["name"])) { header("location:login.php"); }
+session_start(); if (!isset($_SESSION["name"])) { header("location:login.html"); }
 include "dbconn.php";
 $res = $mysqli->query("select parent_id from parent");
 $kill = '';
