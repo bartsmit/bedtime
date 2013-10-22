@@ -5,7 +5,7 @@ if (filesize("/usr/share/bedtime/network") < 7) {
    $myip = $_SERVER['SERVER_ADDR'];
    # Run survey_net to complete the network survey
    $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
-   $result = socket_connect($sock,'127.0.0.1',5000);
+   $result = socket_connect($sock,'127.0.0.1',$btport);
    $buf = "s$myip\n";
    socket_write($sock,$buf,strlen($buf));
    while (filesize("/usr/share/bedtime/network") < 7) {
@@ -30,7 +30,7 @@ if (isset($_GET['sqlrootpw'])) {
             $mysqli->query("flush privileges");
             $mysqli->query("replace into bedtime.settings (variable,value) values('dns','".$_GET['dns']."')");
             $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
-            $result = socket_connect($sock,'127.0.0.1',5000);
+            $result = socket_connect($sock,'127.0.0.1',$btport);
             $buf = "p$pass\n";
             socket_write($sock,$buf,strlen($buf));
             mysqli_close($mysqli);
@@ -54,7 +54,7 @@ if (isset($_GET['sqlrootpw'])) {
       $mysqli->query("replace into bedtime.settings (variable,value) values('dns','".$_GET['dns']."')");
       # Run btsetup with the new password
       $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
-      $result = socket_connect($sock,'127.0.0.1',5000);
+      $result = socket_connect($sock,'127.0.0.1',$btport);
       $buf = "p$pass\n";
       socket_write($sock,$buf,strlen($buf));
       mysqli_close($mysqli);

@@ -1,9 +1,12 @@
 #!/usr/bin/perl
 
+BEGIN {push @INC,'/usr/share/bedtime/bin'}
+
 use strict;
 use warnings;
 use POSIX qw( setsid );
 use IO::Socket;
+use BedtimeDB qw( trim );
 
 open (CONF,'/etc/bedtime.conf') or die "Cannot open configuration file - $!\n";
 # Read the conf file into an array and filter out all lines consisting of just white space and comments
