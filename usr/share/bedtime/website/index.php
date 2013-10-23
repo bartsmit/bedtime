@@ -1,5 +1,5 @@
 <?php
-session_start(); if (!isset($_SESSION["name"])) { header("location:login.html"); }
+session_start(); if (!isset($_SESSION["name"])) { header("location:login.php"); }
 include "dbconn.php";
 $sall = (isset($_GET['sel_all']));
 $awst = (isset($_GET['a_w_start']))   ? $_GET['a_w_start']   : '';
