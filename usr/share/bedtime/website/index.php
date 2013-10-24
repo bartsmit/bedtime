@@ -88,11 +88,13 @@ if ($rewi != '') {
    }
    $mysqli->query($sql);
 }
+$res = squery("select value from settings where varialble='myip'",$mysqli);
+$myip = $res['value'];
 ?>
 <html><head><title>Bedtime</title>
 <link rel="stylesheet" type="text/css" href="desktop.css">
 </head><body>
-<h1>Bedtime</h1>
+<div title="http://<?php echo $myip; ?>"><h1>Bedtime</h1></div>
 <h2><a href="addchild.php">Add/remove a child</a></h2>
 <hr>
 <h2>Edit bedtimes</h2>

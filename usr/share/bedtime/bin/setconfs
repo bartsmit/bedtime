@@ -12,7 +12,7 @@ my $conf = '';
 my $rewl = 0;
 my $hosl = 0;
 foreach my $line (@lines) {
-   if ($line =~ m/^\s+http_port/) {
+   if ($line =~ m/^\s*http_port/) {
       # Set as transparent proxy
       $conf .= $&." 3128 transparent\n";
    } elsif ($line =~ m/url_rewrite_program/) {
