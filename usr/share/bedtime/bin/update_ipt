@@ -170,20 +170,28 @@ foreach my $newmac (@r_macs_r) {
 system($tables);
 $tables = '';
 
-# Set up the reward hash
-my %rw_mac;
+# Set up the reward hashes for the Forward and Prerouting chains
+my %rwf_mac;
+my %rwp_mac;
 
-# Delete all old ground rows
+# Delete all old reward rows
 $sth = $dbh->prepare("delete from reward where end < now()");
 $sth->execute();
 
-# Fill the reward tables array
+# Fill the reward tables hashes
 foreach (`iptables -L FORWARD --line-numbers | grep MAC | grep ACCEPT`) {
    my $line = $& if (m/^\d*/);
    my $mac  = $& if (m/MAC ([0-9A-F]{2}:){5}([0-9A-F]{2})/);
    $mac =~ s/MAC //;
-   $rw_mac{lc($mac)} = $line;
+   $rwf_mac{lc($mac)} = $line;
 }
+foreach (`iptables -t nat -L PREROUTING --line-numbers | grep MAC | grep ACCEPT`) {
+   my $line = $& if (m/^\d*/);
+   my $mac  = $& if (m/MAC ([0-9A-F]{2}:){5}([0-9A-F]{2})/);
+   $mac =~ s/MAC //;
+   $rwp_mac{lc($mac)} = $line;
+}
+
 
 # Find new macs from the reward table
 $sth = $dbh->prepare("select lower(lpad(hex(device.mac),12,'0')) as mac,
@@ -193,32 +201,38 @@ $sth->execute();
 my $ref = $sth->fetchall_arrayref;
 
 # Find all the iptables macs that are no longer in the reward table
-my %cp_mac = %rw_mac;
+my %cpf_mac = %rwf_mac;
+my %cpp_mac = %rwp_mac;
 foreach my $rowref (@$ref) {
    my @row = @$rowref;
    my $d_mac = hex2col($row[0]);
    # Delete the reward table mac from the iptables hash copy
-   delete($cp_mac{$d_mac}) if exists($cp_mac{$d_mac});
+   delete($cpf_mac{$d_mac}) if exists($cpf_mac{$d_mac});
+   delete($cpp_mac{$d_mac}) if exists($cpp_mac{$d_mac});
 }
 
 # Now the copy hash only has macs not in the reward table
 my @dlines=();
-push (@dlines,$cp_mac{$_}) foreach (keys %cp_mac);
+push (@dlines,$cpf_mac{$_}) foreach (keys %cpf_mac);
 
 # Delete these from iptables
 $tables .= "iptables -D FORWARD $_\n" foreach (reverse sort(@dlines));
+
+# Same for the nat table
+@dlines=();
+push (@dlines,$cpp_mac{$_}) foreach (keys %cpp_mac);
+$tables .= "iptables -t nat -D PREROUTING $_\n" foreach (reverse sort(@dlines));
 
 # Find the new macs from the reward table not already in iptables
 my @nmacs = ();
 foreach my $rowref (@$ref) {
    my @row = @$rowref;
    my $mac = hex2col($row[0]);
-   # Add an end time if the reward finishes today
+   # Add an end time if the reward finishes today (datediff is zero)
    my $mod = ($row[1] == 0) ? "$mac -m time --kerneltz --timestop ".$row[2] : $mac;
-   push (@nmacs,$mod) unless exists($rw_mac{$mac});
+   push (@nmacs,$mod) unless exists($rwf_mac{$mac});
 }
-$tables .= "iptables -I FORWARD 1 -m mac --mac-source $_ -j ACCEPT\n" foreach (@nmacs);
-print $tables;
+$tables .= "iptables -I FORWARD 1 -m mac --mac-source $_ -j ACCEPT\niptables -t nat -I PREROUTING 1 -m mac --mac-source $_ -j ACCEPT\n" foreach (@nmacs);
 system($tables);
 $tables='';
 
@@ -245,7 +259,7 @@ $sth->execute();
 $ref = $sth->fetchall_arrayref;
 
 # Find all the iptables macs that are no longer in the ground table
-%cp_mac = %gr_mac;
+my %cp_mac = %gr_mac;
 foreach my $rowref (@$ref) {
    my @row = @$rowref;
    my $d_mac = hex2col($row[0]);
