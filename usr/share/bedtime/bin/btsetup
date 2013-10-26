@@ -134,6 +134,7 @@ my $dns_servers;
 if (get_val('dns') eq 'isp') {
    open (DNS,"/etc/resolv.conf");
    my @dns = <DNS>;
+   close DNS;
    foreach (@dns) {
       if (m/^nameserver/) {
          s/^nameserver\s+//;
@@ -159,6 +160,14 @@ if ((-e "/etc/dhcp/dhcpd.conf") &&
    print CFG $conf;
    close CFG;
 }
+
+# Set resolv.conf to OpenDNS/Google for ntpd
+open (DNS,">/etc/resolv.conf");
+print DNS "nameserver 208.67.222.222\n";
+print DNS "nameserver 208.67.220.220\n";
+print DNS "nameserver 8.8.8.8\n";
+print DNS "nameserver 4.4.4.4\n";
+close DNS;
 
 # And restart the network
 if (-e "/etc/init.d/network") {
