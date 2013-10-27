@@ -51,18 +51,33 @@ while ($row = $res->fetch_assoc()) {
    $mysqli->query("update rules set night='$sst', morning='$snd' where user_id='$id' and days='$weekdays'");
 }
 
+# If the ground dropdown yields an ID, we'll need to ground somebody
 if ($grni != '') {
+   # See if a ground unit is zero - which means remove the ground
    if ($grnu == '0') {
       $sql = "delete from ground where user_id='$grni'";
    } else {
+      # There is a real ground set. First check if units are set
       if ($grnu != '') {
+         # Let MySQL calculate the end date/time from that
          $end = "date_add(now(),interval floor($grnu) ".$_GET['ground_unit'].")";
-      } elseif (($grnt != '') && ($grnd != '')) {
+      } elseif ($grnt != '') {
+         # No units set, check for a manual end time
          $g_time = explode(':',$grnt);
-         $hour = $g_time[0]; $min = $g_time[1]; $sec = $g_time[2];
-         $g_date = explode('-',$grnd);
-         $year = $g_date[0]; $month = $g_date[1]; $day = $g_date[2];
-         $end = "'$grnd $grnt'";
+         $hour = $g_time[0]; $min = $g_time[1];
+         # If the time was set as hh:mm, add zero seconds
+         $sec = (count($g_time) == 2) ? "00" : $g_time[2];
+         $grnt = $hour.":".$min.":".$sec;
+         if ($grnd == '') {
+            # No date entered. See if the end time is tomorrow
+            if (strtotime($grnt) > time()) {
+               $end = "'".date("Y-m-d")." ".$grnt."'";
+            } else {
+               $end = "'".date("Y-m-d",time()+86400)." ".$grnt."'";
+            }
+         } else {
+            $end = "'$grnd $grnt'";
+         }
       }
       $res = $mysqli->query("select * from ground where user_id='$grni'");
       $sql = ($res->num_rows == 0) ? "insert into ground values ('$grni',now(),$end)" : "update ground set start=now(), end=$end where user_id='$grni'";
@@ -76,12 +91,23 @@ if ($rewi != '') {
    } else {
       if ($rewu != '') {
          $end = "date_add(now(),interval floor($rewu) ".$_GET['reward_unit'].")";
-      } elseif (($rewt !='') && ($rewd != '')) {
+      } elseif ($rewt != '') {
+         # No units set, check for a manual end time
          $r_time = explode(':',$rewt);
-         $hour = $r_time[0]; $min = $r_time[1]; $sec = $r_time[2];
-         $r_date = explode('-',$rewd);
-         $year = $r_date[0]; $month = $r_date[1]; $day = $r_date[2];
-         $end = "'$rewd $rewt'";
+         $hour = $r_time[0]; $min = $r_time[1];
+         # If the time was set as hh:mm, add zero seconds
+         $sec = (count($r_time) == 2) ? "00" : $r_time[2];
+         $rewt = $hour.":".$min.":".$sec;
+         if ($rewd == '') {
+            # No date entered. See if the end time is tomorrow
+            if (strtotime($rewt) > time()) {
+               $end = "'".date("Y-m-d")." ".$rewt."'";
+            } else {
+               $end = "'".date("Y-m-d",time()+86400)." ".$rewt."'";
+            }
+         } else {
+            $end = "'$rewd $rewt'";
+         }
       }
       $res = $mysqli->query("select * from reward where user_id='$rewi'");
       $sql = ($res->num_rows == 0) ? "insert into reward values ('$rewi',now(),$end)" : "update reward set start=now(), end=$end where user_id='$rewi'";
