@@ -79,5 +79,6 @@ else
    /etc/init.d/bedtime start
    chkconfig bedtime on
 fi
-
+mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql mysql
 mysql < /usr/share/bedtime/create.sql
+mysql -e "create table bedtime.time_zone_name select * from mysql.time_zone_name;"
