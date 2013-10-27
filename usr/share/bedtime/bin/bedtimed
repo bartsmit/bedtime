@@ -41,10 +41,12 @@ while ( my $client = $socket->accept() ) {
    if ($input =~ /^s/) {
       $input =~ s/^s//;
       system("/usr/share/bedtime/bin/survey_net $input")
-   }
-   if ($input =~ /^p/) {
+   } elsif ($input =~ /^p/) {
       $input =~ s/^p//;
       system("/usr/share/bedtime/bin/btsetup $input");
+   } elsif ($input =~ /^t/) {
+      $input =~ s/^t//;
+      system("ln -sf /usr/share/zoneinfo/$input /etc/localtime");
    }
    close $client;
 }

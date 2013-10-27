@@ -27,6 +27,7 @@ if (isset($_GET['sqlrootpw'])) {
             $pass = substr(md5(uniqid()), 0, 12);
             $mysqli->query("delete from mysql.user where user='sleepy'");
             $mysqli->query("grant all on bedtime.* to 'sleepy'@'localhost' identified by '$pass'");
+            $mysqli->query("grant select on mysql.time_zone_name to 'sleepy'@'localhost' identified by '$pass'");
             $mysqli->query("flush privileges");
             $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
             $result = socket_connect($sock,'127.0.0.1',5000);
@@ -49,6 +50,7 @@ if (isset($_GET['sqlrootpw'])) {
       $pass = substr(md5(uniqid()), 0, 12);
       $mysqli->query("delete from mysql.user where user='sleepy'");
       $mysqli->query("grant all on bedtime.* to 'sleepy'@'localhost' identified by '$pass'");
+      $mysqli->query("grant select on mysql.time_zone_name to 'sleepy'@'localhost' identified by '$pass'");
       $mysqli->query("flush privileges");
       $mysqli->query("replace into bedtime.settings (variable,value) values('dns','".$_GET['dns']."')");
       # Run btsetup with the new password

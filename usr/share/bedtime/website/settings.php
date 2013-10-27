@@ -1,6 +1,14 @@
 <?php
 session_start(); if (!isset($_SESSION["name"])) { header("location:login.php"); }
 include "dbconn.php";
+$myreg = (isset($_GET['region'])) ? $_GET['region'] : '';
+$mytwn = (isset($_GET['town']))   ? $_GET['town']   : '';
+if ($mytwn != '') {
+   $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
+   $result = socket_connect($sock,'127.0.0.1',5000);
+   $buf = "t$mytwn\n";
+   socket_write($sock,$buf,strlen($buf));
+}
 $res = $mysqli->query("select parent_id from parent");
 $kill = '';
 $pass_set = 0;
@@ -69,9 +77,54 @@ foreach ($weekdays as $key => $day) {
    $sel = ($key == $mask) ? ' selected' : '';
    echo "<option value=\"$key\"$sel>$day</option>\n";
 }
-echo "</select><hr>";
+echo "</select><br>";
+# See if the region and town have been set
+if ($myreg == '') {
+   $res = $mysqli->query("select value from settings where variable='region'");
+   if ($res->num_rows > 0) {
+      $row = $res->fetch_assoc();
+      $myreg = $row['value'];
+   }
+} else {
+   $res = $mysqli->query("replace into settings values('region','$myreg')");
+}
+if ($mytwn == '') {
+   $res = $mysqli->query("select value from settings where variable='town'");
+   if ($res->num_rows > 0) {
+      $row = $res->fetch_assoc();
+      $mytwn = $row['value'];
+   }
+} else {
+   $res = $mysqli->query("replace into settings values('town','$mytwn')");
+}
+
+$res = $mysqli->query("select left(Name,locate('/',Name)-1) as region from time_zone_name group by region order by region");
+if ($res->num_rows == 0) {
+   echo "Enter timezone: <input type=\"text\" name=\"man_region\">\n";
+} else {
+   echo "Region: <select name=\"region\">\n";
+   while ($row = $res->fetch_assoc()) {
+      $reg = $row['region'];
+      $sel = ($reg == $myreg) ? ' selected ' : '';
+      echo "<option value=\"$reg\"$sel>$reg</option>\n";
+   }
+   echo "</select><br>\n";
+}
+if ($myreg != '') {
+   $res = $mysqli->query("select Name as town from time_zone_name where Name like '$myreg/%' order by town");
+   echo "Timezone: <select name=\"town\">\n";
+   while ($row = $res->fetch_assoc()) {
+      $twn = $row['town'];
+      $sel = ($twn == $mytwn) ? ' selected ' : '';
+      echo "<option value\"$twn\"$sel>$twn</option>\n";
+   }
+   echo "</select><br>\n";
+}
+if (($mytwn != '') && (strpos($mytwn, $myreg)!== false)) {
+   echo "The timezone is set to $mytwn<br>\n";
+}
 ?>
-<input type="submit" value="submit">
+<hr><input type="submit" value="submit">
 </form>
 <a href="index.php">return</a><br>
 Or <a href="logout.html">log out</a> of Bedtime</body></html>
