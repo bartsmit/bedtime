@@ -7,6 +7,11 @@ use DBI;
 use strict;
 use warnings;
 
+my $iptv = `iptables -V`;
+$iptv =~ s/^\s*iptables\s+v//;
+my ($maj,$min,$rel) = split(/\./,$iptv);
+my $tz = (($maj <= 1) && ($min <= 4) && ($rel <= 10)) ? "--localtz" : "--kerneltz";
+
 # Connect to the database
 my $dbh = &BedtimeDB::dbconn;
 
@@ -148,20 +153,20 @@ foreach my $newmac (@r_macs_r) {
          # Find out if we're straddling midnight
          if (time2secs($start) > 43200) {
             $tables .= "iptables -I FORWARD 1 -m mac --mac-source $mac -m time --timestart 00:00:00 "; 
-            $tables .= "--timestop $finish --weekdays $tomorrows --kerneltz -j REJECT\n";
+            $tables .= "--timestop $finish --weekdays $tomorrows $tz -j REJECT\n";
             $tables .= "iptables -I FORWARD 1 -m mac --mac-source $mac -m time --timestart $start ";
-            $tables .= "--timestop 23:59:59 --weekdays $todays --kerneltz -j REJECT\n";
+            $tables .= "--timestop 23:59:59 --weekdays $todays $tz -j REJECT\n";
             $tables .= "iptables -t nat -I PREROUTING 1 -m mac --mac-source $mac ";
-            $tables .= "-m time --timestart 00:00:00 --timestop $finish --weekdays $tomorrows --kerneltz -m tcp ";
+            $tables .= "-m time --timestart 00:00:00 --timestop $finish --weekdays $tomorrows $tz -m tcp ";
             $tables .= "-p tcp ! -d $myip --dport 80 -j REDIRECT --to-ports 3128\n";
             $tables .= "iptables -t nat -I PREROUTING 1 -m mac --mac-source $mac ";
-            $tables .= "-m time --timestart $start --timestop 23:59:59 --weekdays $todays --kerneltz -m tcp ";
+            $tables .= "-m time --timestart $start --timestop 23:59:59 --weekdays $todays $tz -m tcp ";
             $tables .= "-p tcp ! -d $myip --dport 80 -j REDIRECT --to-ports 3128\n";
          } else {
             $tables .= "iptables -I FORWARD 1 -m mac --mac-source $mac -m time --timestart $start ";
-            $tables .= "--timestop $finish --weekdays $tomorrows --kerneltz -j REJECT\n";
+            $tables .= "--timestop $finish --weekdays $tomorrows $tz -j REJECT\n";
             $tables .= "iptables -t nat -I PREROUTING 1 -m mac --mac-source $mac ";
-            $tables .= "-m time --timestart $start --timestop $finish --weekdays $tomorrows --kerneltz -m tcp ";
+            $tables .= "-m time --timestart $start --timestop $finish --weekdays $tomorrows $tz -m tcp ";
             $tables .= "-p tcp ! -d $myip --dport 80 -j REDIRECT --to-ports 3128\n";
          }
       }
@@ -229,7 +234,7 @@ foreach my $rowref (@$ref) {
    my @row = @$rowref;
    my $mac = hex2col($row[0]);
    # Add an end time if the reward finishes today (datediff is zero)
-   my $mod = ($row[1] == 0) ? "$mac -m time --kerneltz --timestop ".$row[2] : $mac;
+   my $mod = ($row[1] == 0) ? "$mac -m time $tz --timestop ".$row[2] : $mac;
    push (@nmacs,$mod) unless exists($rwf_mac{$mac});
 }
 $tables .= "iptables -I FORWARD 1 -m mac --mac-source $_ -j ACCEPT\niptables -t nat -I PREROUTING 1 -m mac --mac-source $_ -j ACCEPT\n" foreach (@nmacs);
@@ -279,7 +284,7 @@ foreach my $rowref (@$ref) {
    my @row = @$rowref;
    my $mac = hex2col($row[0]);
    # Add an end time if the ground finishes today
-   my $mod = ($row[1] == 0) ? "$mac -m time --kerneltz --timestop ".$row[2] : $mac;
+   my $mod = ($row[1] == 0) ? "$mac -m time $tz --timestop ".$row[2] : $mac;
    push (@nmacs,$mod) unless exists($gr_mac{$mac});
 }
 $tables .= "iptables -I FORWARD 1 -m mac --mac-source $_ -j REJECT\n" foreach (@nmacs);
@@ -363,7 +368,7 @@ sub mod_rule {
       # If there are two new rules, start with the early one
       my $finish = $straddle ? '23:59:59' : $new[0]->{morning};
 
-      $ipt .= "-m time --kerneltz --timestart $new[0]->{night} --timestop $finish ";
+      $ipt .= "-m time $tz --timestart $new[0]->{night} --timestop $finish ";
       my $mask = $new[0]->{days};
       $mask = $mask >> 1 if (time2secs($new[0]->{night}) < 43200);
       $ipt .= "--weekdays " . mask2days($mask) if $mask;
@@ -383,7 +388,7 @@ sub mod_rule {
          } else {
             $ipt .= "$prefix -R $chain $old[1]->{line} -m mac --mac-source $mac ";
             # Second rule is the late one
-            $ipt .= "-m time --kerneltz --timestart 00:00:00 --timestop $new[0]->{morning} ";
+            $ipt .= "-m time $tz --timestart 00:00:00 --timestop $new[0]->{morning} ";
             $ipt .= "--weekdays " . mask2days($mask) if $mask;
             $ipt .= $action;
          }
@@ -391,7 +396,7 @@ sub mod_rule {
          # Create an add rule after the first
          my $line = $old[0]->{line} + 1;
          $ipt .= "$prefix -I $chain $line -m mac --mac-source $mac ";
-         $ipt .= "-m time --kerneltz --timestart 00:00:00 --timestop $new[0]->{morning} ";
+         $ipt .= "-m time $tz --timestart 00:00:00 --timestop $new[0]->{morning} ";
          $ipt .= "--weekdays " . mask2days($mask) if $mask;
          $ipt .= $action;
       }
