@@ -89,6 +89,9 @@ if ((-e "/etc/sysconfig/network-scripts/ifcfg-$myif") &&
    print CFG "PREFIX=$mask\n";
    print CFG "GATEWAY=$mydg\n";
    print CFG "NM_CONTROLLED=no\n";
+   print CFG "DNS1=208.67.222.222\n";
+   print CFG "DNS2=208.67.220.220\n";
+   print CFG "DNS3=8.8.8.8\n";
    print CFG "IPV6INIT=yes\n";
    close CFG;
 } elsif ((-e "/etc/network/interfaces") &&
@@ -160,14 +163,6 @@ if ((-e "/etc/dhcp/dhcpd.conf") &&
    print CFG $conf;
    close CFG;
 }
-
-# Set resolv.conf to OpenDNS/Google for ntpd
-open (DNS,">/etc/resolv.conf");
-print DNS "nameserver 208.67.222.222\n";
-print DNS "nameserver 208.67.220.220\n";
-print DNS "nameserver 8.8.8.8\n";
-print DNS "nameserver 4.4.4.4\n";
-close DNS;
 
 # And restart the network
 if (-e "/etc/init.d/network") {
