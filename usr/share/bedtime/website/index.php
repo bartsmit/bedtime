@@ -114,13 +114,20 @@ if ($rewi != '') {
    }
    $mysqli->query($sql);
 }
-$res = squery("select value from settings where varialble='myip'",$mysqli);
-$myip = $res['value'];
+# Get the IP address to display
+$res = $mysqli->query("select value from settings where variable='myip'");
+$numrows = $res->num_rows;
+if ($numrows != 0) {
+   $row = $res->fetch_assoc();
+   $url = "http://".$row['value'];
+} else {
+   $url = '';
+}
 ?>
 <html><head><title>Bedtime</title>
 <link rel="stylesheet" type="text/css" href="desktop.css">
 </head><body>
-<div title="http://<?php echo $myip; ?>"><h1>Bedtime</h1></div>
+<div title="<?php echo $url; ?>"><h1>Bedtime</h1></div>
 <h2><a href="addchild.php">Add/remove a child</a></h2>
 <hr>
 <h2>Edit bedtimes</h2>
@@ -193,4 +200,5 @@ foreach ($children as $id => $name) {
 </form><br>
 Cancel and <a href="index.php">reset</a><br>
 Or <a href="logout.html">log out</a> of Bedtime
+Last refresh: <?php echo date("h:i" ,time()); ?>
 </body></html>
