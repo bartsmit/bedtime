@@ -199,6 +199,15 @@ foreach ($children as $id => $name) {
 <input type="submit" value="submit">
 </form><br>
 Cancel and <a href="index.php">reset</a><br>
-Or <a href="logout.html">log out</a> of Bedtime
-Last refresh: <?php echo date("h:i" ,time()); ?>
+Or <a href="logout.html">log out</a> of Bedtime<br>
+<?php
+# Show the time if the timezone is set
+$res = $mysqli->query("select value from settings where variable='town'");
+$numrows = $res->num_rows;
+if ($numrows != 0) {
+   $row = $res->fetch_assoc();
+   date_default_timezone_set($row['value']);
+   echo "Last refresh: ".date("H:i" ,time());
+}
+?>
 </body></html>
