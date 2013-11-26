@@ -49,6 +49,33 @@ while (my @row = $sth->fetchrow_array) {
    $tables .= "-p tcp ! -d $myip --dport 80 -j REDIRECT --to-ports 3128\n"; 
 }
 
+# Same for yesterday (so rules won't do a Cinderella)
+$sth = $dbh->prepare(
+   "select lpad(hex(device.mac),12,'0') as mac,
+   if (rules.night<'12:00:00',
+      convert_tz(concat_ws(' ',curdate(), rules.night),'$town','UTC'),
+      convert_tz(concat_ws(' ',curdate()-interval 1 day,rules.night),'$town','UTC'))
+   as start,
+   convert_tz(concat_ws(' ',curdate(), rules.morning),'$town','UTC')
+   as stop
+   from rules inner join device on rules.user_id=device.user_id
+   where days=$mask");
+$sth->execute();
+
+while (my @row = $sth->fetchrow_array) {
+   my ($mac, $start, $stop) = (@row);
+   $mac = join(':',( lc($mac) =~ m/../g ));
+   $start =~ s/ /T/;
+   $stop  =~ s/ /T/;
+   $tables .= "iptables -A FORWARD -m mac --mac-source $mac ";
+   $tables .= "-m time --datestart $start --datestop $stop --utc ";
+   $tables .= "-j REJECT\n";
+   $tables .= "iptables -t nat -A PREROUTING -m mac --mac-source $mac ";
+   $tables .= "-m time --datestart $start --datestop $stop --utc ";
+   $tables .= "-p tcp ! -d $myip --dport 80 -j REDIRECT --to-ports 3128\n";
+}
+
+
 # And the ground rules
 $sth = $dbh->prepare(
    "select lpad(hex(device.mac),12,'0') as mac,
@@ -89,3 +116,4 @@ while (my @row = $sth->fetchrow_array) {
 }
 
 system($tables);
+system("iptables-save > /etc/sysconfig/iptables");
