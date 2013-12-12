@@ -1,0 +1,33 @@
+#!/usr/bin/perl
+
+BEGIN {push @INC,'/usr/share/bedtime/bin'}
+
+use warnings;
+use strict;
+
+my $pass = $ARGV[0];
+my $conf = '';
+
+# See if we have a valid password
+if (length($pass) < 1) {
+   `logger cfsetup was called with an empty password`;
+} else {
+   # Read the conf file into an array
+   `logger cfsetup was called with password $pass`;
+   open (CONF, "/etc/bedtime.conf");
+   my @lines = <CONF>;
+   close CONF;
+
+   # Look for the dbpass line
+   foreach my $line (@lines) {
+      if ($line =~ m/dbpass/) {
+         # Replace the password
+         $conf .= "$`$& = $pass\n";
+      } else {
+         $conf .= $line;
+      }
+   } 
+   # Write it back to the conf file
+   open (CONF,">/etc/bedtime.conf");
+   print CONF "$conf"; close CONF;
+} 

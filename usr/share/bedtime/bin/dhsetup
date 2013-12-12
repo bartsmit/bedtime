@@ -1,0 +1,106 @@
+#!/usr/bin/perl
+
+BEGIN {push @INC,'/usr/share/bedtime/bin'}
+
+use warnings;
+use strict;
+use BedtimeDB qw(get_val set_val long2ip ip2long);
+
+# Pick up the variables from the database
+my $mask = get_val('mask');
+my $myip = get_val('myip');
+my $mydg = get_val('mydg');
+my $dhcp = get_val('dhcp');
+
+# Change prefix to netmask
+my $nm_num;
+for(my $i=0;$i<$mask;$i++) {
+   $nm_num += 2147483648 >> $i;
+}
+
+# And calculete the size of the subnet
+my $width;
+for(my $i=0;$i<(32-$mask);$i++) {
+   $width += 1 << $i;
+}
+
+# Calculate some handy metrics
+my $netmask = long2ip($nm_num);
+my $network = long2ip($nm_num & ip2long($myip));
+my $broadcast = long2ip(ip2long($network)+$width);
+
+# The dhcp range excludes statics
+my @excludes;
+push (@excludes,ip2long($network));
+push (@excludes,ip2long($myip));
+push (@excludes,ip2long($mydg));
+push (@excludes,ip2long($dhcp)) unless ($dhcp eq $mydg);
+push (@excludes,ip2long($network)+$width);
+@excludes = sort(@excludes);
+
+# Convert the space between the excludes as dhcp ranges
+my $ranges;
+my $last = 0;
+foreach (@excludes) {
+   # If we're past the first exclude and there is enough room for a range
+   $ranges .= "range ".long2ip($last+1)." ".long2ip($_-1).";\n" if (($last > 0) && (($_ - $last) > 2));
+   $last = $_;
+}
+
+# Set up the DHCP configuration
+my $conf = '';
+my $dns_servers = '';
+for (my $i=1;$i<4;$i++) {
+   my $dns = get_val("dns$i");
+   $dns_servers .= "$dns," unless length($dns) < 7;
+}
+$dns_servers =~ s/,$/;/;
+if ((-e "/etc/dhcp/dhcpd.conf") &&
+   (`grep $network /etc/dhcp/dhcpd.conf | wc -l` == 0)) {
+   `cp -f /etc/dhcp/dhcpd.conf /etc/dhcp/dhcpd.conf.bak`;
+   open (CFG,">/etc/dhcp/dhcpd.conf");
+   $conf  = "authoritative;\ndefault-lease-time 3600;\nmax-lease-time 14400;\n";
+   $conf .= "option subnet-mask $netmask;\noption routers $myip;\n";
+   $conf .= "option domain-name-servers $dns_servers\n";
+   $conf .= "subnet $network netmask $netmask {\n$ranges}\n";
+   print CFG $conf;
+   close CFG;
+}
+
+# Restart dhcp
+if (-e "/etc/init.d/dhcpd") {
+   system("/etc/init.d/dhcpd restart");
+} elsif (-e  "/etc/init.d/networking") {
+   system("/etc/init.d/networking restart");
+} elsif (`hash systemctl` eq '') {
+   system("systemctl restart dhcpd.service");
+}
+
+# Find the leases file
+my $leases = `find /var -name dhcpd*.leases | grep -v 6`;
+set_val('dhcp_leases',$leases);
+
+# Enable routing
+open (CONF, "/etc/sysctl.conf");
+my @lines = <CONF>;
+close CONF;
+$conf = '';
+
+# Look for the sysctl line
+my $find = 0;
+foreach my $line (@lines) {
+   if ($line =~ m/net\.ipv4\.ip_forward/) {
+      # Replace with 1
+      $conf .= "$`$& = 1\n";
+      $find = 1;
+   } else {
+      $conf .= $line;
+   }
+}
+$conf .= "net.ipv4.ip_forward = 1\n" unless $find;
+
+open (CONF, ">/etc/sysctl.conf");
+print CONF $conf;
+close CONF;
+
+system("sysctl -p");

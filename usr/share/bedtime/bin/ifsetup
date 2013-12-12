@@ -1,0 +1,115 @@
+#!/usr/bin/perl
+
+BEGIN {push @INC,'/usr/share/bedtime/bin'}
+
+use warnings;
+use strict;
+use Net::DNS::Resolver;
+use BedtimeDB qw(get_val set_val);
+
+# Use the survey results
+open (NET, "/usr/share/bedtime/network");
+my ($myip,$mydg,$dhcp,$mask,$myif);
+foreach (<NET>) {
+   chomp;
+   my @bits = split(/\//);
+   if ($bits[1] eq 'dhcp') {
+      $dhcp = $bits[0];
+   } elsif ($bits[1] eq 'dg') {
+      $mydg = $bits[0];
+   } elsif ($bits[1] =~ m/m$/) {
+      $myip = $bits[0];
+      $mask = $bits[1];
+      $mask =~ s/m$//;
+      $myif = $bits[2];
+      chomp($myif);
+   }
+}
+close NET;
+
+# Write survey details into the database
+set_val('myip',$myip);
+set_val('mydg',$mydg);
+set_val('dhcp',$dhcp);
+set_val('mask',$mask);
+set_val('myif',$myif);
+
+# Set the DNS servers from OpenDNS, Google and ISP
+my @opendns = ('208.67.222.222','208.67.220.220');
+my @googles = ('8.8.8.8','8.8.4.4');
+my @ispdns;
+open (DNS,"/etc/resolv.conf");
+my @dns = <DNS>; close DNS;
+foreach (@dns) {
+   if (m/^nameserver/) {
+      s/^nameserver\s+//;
+      chomp;
+      push (@ispdns,$_);
+   }
+}
+
+# Put them in the right order
+my @alldns;
+if (get_val('dns') eq 'isp') {
+   @alldns = (@ispdns, @googles, @opendns);
+} else {
+   @alldns = (@opendns, @googles, @ispdns);
+}
+
+# Survival of the fittest
+my $i = 0; my @nameservers;
+foreach (@alldns) {
+   if (dnstst($_)) {
+      push (@nameservers, $_);
+      $i++;
+      set_val("dns$i",$_);
+      last if ($i > 2);
+   }
+}
+
+# Change the interface to static
+if (`grep $myip /etc/sysconfig/network-scripts/ifcfg-$myif | wc -l` == 0) {
+   system("cp -f /etc/sysconfig/network-scripts/ifcfg-$myif /etc/sysconfig/network-scripts/ifcfg-$myif.bak");
+   open (CFG,">/etc/sysconfig/network-scripts/ifcfg-$myif");
+   print CFG "DEVICE=$myif\n";
+   print CFG "ONBOOT=yes\n";
+   print CFG "IPADDR=$myip\n";
+   print CFG "PREFIX=$mask\n";
+   print CFG "GATEWAY=$mydg\n";
+   print CFG "NM_CONTROLLED=no\n";
+   print CFG "DNS1=".$nameservers[0]."\n";
+   print CFG "DNS2=".$nameservers[1]."\n";
+   print CFG "DNS3=".$nameservers[2]."\n";
+   print CFG "IPV6INIT=yes\n";
+   close CFG;
+}
+
+# Enable IPv6
+if ((-e "/etc/sysconfig/network") &&
+   (`grep NETWORKING_IPV6 /etc/sysconfig/network | wc -l` == 0)) {
+   open (CFG,">>/etc/sysconfig/network");
+   print CFG "NETWORKING_IPV6=yes";
+   close CFG;
+}
+
+# And restart the network
+if (-e "/etc/init.d/network") {
+   system("/etc/init.d/network restart");
+} elsif (-e "/etc/init.d/networking") {
+   system("/etc/init.d/networking restart");
+} elsif (`hash systemctl` eq '') {
+   system("systemctl restart network.service");
+}
+
+#### subroutines ####
+
+sub dnstst {
+   my $tstsrv = shift;
+   my $res = Net::DNS::Resolver->new (
+      nameservers => [($tstsrv)],
+      udp_timeout => 2,
+      tcp_timeout => 2,
+   );
+   my $query = $res->search(".","SOA");
+   return $query;
+}
