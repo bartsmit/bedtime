@@ -49,6 +49,9 @@ while ( my $client = $socket->accept() ) {
    } elsif ($input =~ /^t/) {
       $input =~ s/^t//;
       system("ln -sf /usr/share/zoneinfo/$input /etc/localtime");
+   } elsif ($input =~ /^r/) {
+      $input =~ s/^r//;
+      system("/usr/share/bedtime/bin/restore $input");
    }
    close $client;
 }

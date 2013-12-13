@@ -1,0 +1,33 @@
+#!/usr/bin/perl
+
+BEGIN {push @INC,'/usr/share/bedtime/bin'}
+
+use BedtimeDB qw(getconf);
+use warnings;
+use strict;
+
+my $file = $ARGV[0];
+my $msql = '';
+
+unlink "/tmp/$file";
+
+$file =~ s/.zip$/.sql/;
+$file =~ s/^backup/dump/;
+
+open (SQL,"/tmp/$file") or die "Cannot open sql restore $file - $!\n";
+my @sql = <SQL>; close SQL;
+
+foreach my $line (@sql) {
+   $line =~ s/CREATE TABLE/CREATE TABLE IF NOT EXISTS/g;
+   $line =~ s/INSERT INTO/REPLACE INTO/g;
+   $msql .= $line;
+}
+
+open (SQL,">/tmp/$file") or die "Cannot open sql restore $file - $!\n";
+print SQL $msql;
+close SQL;
+
+my ($host,$db,$user,$pass) = getconf();
+system("mysql bedtime -u $user -p$pass < /tmp/$file");
+
+unlink "/tmp/$file";

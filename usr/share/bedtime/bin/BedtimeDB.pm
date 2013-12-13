@@ -7,9 +7,9 @@ use DBI;
 use strict;
 
 our @ISA = qw( Exporter );
-our @EXPORT_OK = qw(dbconn get_val set_val ip2long long2ip);
+our @EXPORT_OK = qw(getconf dbconn get_val set_val ip2long long2ip);
 
-sub dbconn {
+sub getconf {
    open (CONF,'/etc/bedtime.conf') or die "Cannot open configuration file - $!\n";
    # Read the conf file into an array and filter out all lines consisting of just white space and comments
    my @conf = <CONF>; close CONF;
@@ -23,10 +23,13 @@ sub dbconn {
       my @pair = split(/\s*=\s*/);
       $vals{trim($pair[0])}=trim($pair[1]);
    }
-   # Collect the credentials and connect to the database
-   my $user = $vals{'dbuser'};
-   my $pass = $vals{'dbpass'};
-   my $dbis = "DBI:mysql:".$vals{'dbname'}.":".$vals{'dbhost'};
+   # Collect the database values
+   return ($vals{'dbhost'}, $vals{'dbname'}, $vals{'dbuser'}, $vals{'dbpass'});
+}
+
+sub dbconn {
+   my ($host,$db,$user,$pass) = getconf();
+   my $dbis = "DBI:mysql:$db:$host";
    DBI->connect($dbis,$user,$pass) or die "Cannot connect to database $dbis with user $user and password $pass - $!\n";
 }
 

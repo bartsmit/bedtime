@@ -124,7 +124,12 @@ if (($mytwn != '') && (strpos($mytwn, $myreg)!== false)) {
    echo "The timezone is set to $mytwn<br>\n";
 }
 ?>
-<hr><input type="submit" value="submit">
-</form>
+<br><br><input type="submit" value="Submit"> parent and settings changes.
+</form><hr><h2>Backup/Restore</h2>
+<a href="backup.php">backup</a><br>
+<form action="restore.php" method="post" enctype="multipart/form-data">
+Restore from: <input type="file" name="dump" size="40" />
+<input type="submit" name="submit" value="Restore" /></form>
+<hr>
 <a href="index.php">return</a><br>
 Or <a href="logout.html">log out</a> of Bedtime</body></html>

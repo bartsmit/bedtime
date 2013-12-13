@@ -6,7 +6,7 @@ $passwd = $_POST['password'];
 
 $res = $mysqli->query("select * from parent where name='$parent' and password=md5('$passwd')");
 
-if (($res->num_rows) == 1) {
+if (($res->num_rows) > 0) {
    session_start();
    $_SESSION["name"] = $parent;
    header("location:index.php");

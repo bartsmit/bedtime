@@ -1,7 +1,5 @@
 #!/usr/bin/perl
 
-BEGIN {push @INC,'/usr/share/bedtime/bin'}
-
 use warnings;
 use strict;
 
