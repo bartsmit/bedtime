@@ -30,4 +30,12 @@ if (strlen($mac) > 2) {
 }
 ?>
 <tr><td>&nbsp;</td><td>&nbsp;</td><td><input type="submit" name="Submit" value="Login"></td></tr>
-</table></td></form></tr></table></body></html>
+</table></td></form></tr></table><br><br>
+<?php
+$res = squery("select value from settings where variable='version'",$mysqli);
+$ver = $res['value'];
+echo "<div class=\"version\">\n";
+echo "<p>Bedtime version $ver</p>\n";
+echo "</div>\n";
+?>
+</body></html>

@@ -6,3 +6,4 @@ font-family:verdana,arial,'sans serif';
 h1 {font-size:160%;}
 h2 {font-size:120%;}
 th {font-size:80%;}
+div.version {font-size:75%; font-style:italic; color:#C0C0C0;}

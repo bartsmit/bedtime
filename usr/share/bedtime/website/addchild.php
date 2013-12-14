@@ -78,4 +78,12 @@ foreach ($children as $id => $name) {
 <input type="submit" value="submit">
 </form>
 <br>Cancel and <a href="index.php">return</a><br>
-Or <a href="logout.html">log out</a> of Bedtime</body></html>
+Or <a href="logout.html">log out</a> of Bedtime<br><br>
+<?php
+$res = squery("select value from settings where variable='version'",$mysqli);
+$ver = $res['value'];
+echo "<div class=\"version\">\n";
+echo "<p>Bedtime version $ver</p>\n";
+echo "</div>\n";
+?>
+</body></html>

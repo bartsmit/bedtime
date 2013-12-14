@@ -150,9 +150,15 @@ if ($numrows == 0) {
       $children[$id] = $cn;
       $wf = $row['w_fm'];$wt = $row['w_to']; $sf = $row['s_fm']; $st = $row['s_to'];
       $en = ''; $rn = ''; $gn = '';
+      $nl = (isset($_GET["l_$id"])) ? $_GET["l_$id"] : '';
       if ($row['rc'] > 0) { $rn = " <strong>R</strong>"; $en = "reward ends ".$row['re']; }
       if ($row['gc'] > 0) { $gn = " <strong>G</strong>"; $en = "ground ends ".$row['ge']; }
-      echo "<tr><td><div title =\"$en\">$cn $gn $rn</div></td><td align=\"right\">$ds</td><td align=\"right\">";
+      if (($nl <> '') && ($nl <> $ds)) {
+         $ds = $nl;
+         $mysqli->query("update child set description='$ds' where user_id=$id");
+      }
+      echo "<tr><td><div title =\"$en\">$cn $gn $rn</div></td>";
+      echo "<td align=\"right\"><input type=\"text\" value=\"$ds\" name=\"l_$id\"></td><td align=\"right\">";
       echo "<input type=\"checkbox\" name=\"sel$id\" value=\"sel$id\"></td>\n";
       echo "<td align=\"right\"><input type=\"text\" name=\"w_start$id\" value=\"$wf\" size=\"8\"></td>\n";
       echo "<td align=\"right\"><input type=\"text\" name=\"w_end$id\" value=\"$wt\" size=\"8\"></td>\n";
@@ -209,5 +215,11 @@ if ($numrows != 0) {
    date_default_timezone_set($row['value']);
    echo "Last refresh: ".date("H:i" ,time());
 }
+echo "<br><br>\n";
+$res = squery("select value from settings where variable='version'",$mysqli);
+$ver = $res['value'];
+echo "<div class=\"version\">\n";
+echo "<p>Bedtime version $ver</p>\n";
+echo "</div>\n";
 ?>
 </body></html>

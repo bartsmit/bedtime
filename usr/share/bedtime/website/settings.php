@@ -56,7 +56,13 @@ while($obj = $res->fetch_object()) {
    $cn = $obj->name;
    $ds = $obj->description;
    $pw = $obj->password;
-   echo "<tr><td>$cn</td><td>$ds</td><td><input type=\"password\" name=\"p_$id\"></td>";
+   $nl = (isset($_GET["l_$id"])) ? $_GET["l_$id"] : '';
+   if (($nl <> '') && ($nl <> $ds)) {
+      $mysqli->query("update parent set description='$nl' where parent_id=$id");
+      $ds = $nl;
+   }
+   echo "<tr><td>$cn</td><td><input type=\"text\" value=\"$ds\" name=\"l_$id\"></td>";
+   echo "<td><input type=\"password\" name=\"p_$id\"></td>";
    echo "<td><input type=\"checkbox\" name=\"d_$id\" value=\"d_$id\"></td></tr>\n";
 }
 echo "</table><br>Add Parent<br>Name <input type=\"text\" name=\"name\"> Description ";
@@ -132,4 +138,12 @@ Restore from: <input type="file" name="dump" size="40" />
 <input type="submit" name="submit" value="Restore" /></form>
 <hr>
 <a href="index.php">return</a><br>
-Or <a href="logout.html">log out</a> of Bedtime</body></html>
+Or <a href="logout.html">log out</a> of Bedtime<br><br>
+<?php
+$res = squery("select value from settings where variable='version'",$mysqli);
+$ver = $res['value'];
+echo "<div class=\"version\">\n";
+echo "<p>Bedtime version $ver</p>\n";
+echo "</div>\n";
+?>
+</body></html>
