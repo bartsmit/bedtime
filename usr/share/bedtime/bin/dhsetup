@@ -78,6 +78,7 @@ if (-e "/etc/init.d/dhcpd") {
 
 # Find the leases file
 my $leases = `find /var -name dhcpd*.leases | grep -v 6`;
+chomp $leases;
 set_val('dhcp_leases',$leases);
 
 # Enable routing

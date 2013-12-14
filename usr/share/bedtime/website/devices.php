@@ -13,6 +13,12 @@ $result = socket_connect($sock,'127.0.0.1',5000);
 $buf = "d\n";
 socket_write($sock,$buf,strlen($buf));
 
+$sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
+$result = socket_connect($sock,'127.0.0.1',5000);
+$buf = "u\n";
+socket_write($sock,$buf,strlen($buf));
+
+
 if (isset($_GET["manlst"])) {
    $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
    $buf = "m\n";
@@ -44,11 +50,12 @@ $sql  = "select inet_ntoa(ip) as ip,
             (manufacturers.mac & x'FFFFFF000000') = (device.mac & x'FFFFFF000000') or
             (manufacturers.mac & x'FFFFFFFFF000') = (device.mac & x'FFFFFFFFF000')) as label,
          lpad(hex(mac),12,'0') as mac,
-         first_seen as first,
+         first_seen  as first,
+         description as descr,
          user_id as id from device;";
 $res = $mysqli->query($sql);
 echo "<form name=\"devices\"><table borders=\"0\">\n";
-echo "<th>Owner</th><th>Make</th><th>MAC</th><th>IP address</th><th>First seen</th><th>Delete</th>\n";
+echo "<th>Owner</th><th>Make</th><th>Description</th><th>MAC</th><th>IP address</th><th>First seen</th><th>Delete</th>\n";
 $kill_list = '';
 while($obj = $res->fetch_object()) {
    $did    = $obj->id;
@@ -58,12 +65,19 @@ while($obj = $res->fetch_object()) {
    $vendor = $obj->vendor;
    $label  = $obj->label;
    $first  = $obj->first;
+   $descr  = $obj->descr;
    $newid  = (isset($_GET["o_$mac"])) ? $_GET["o_$mac"] : '';
    $remove = (isset($_GET["d_$mac"])) ? $_GET["d_$mac"] : '';
+   $newdsc = (isset($_GET["l_$mac"])) ? $_GET["l_$mac"] : '';
    if (($newid <> '') && ($newid <> $did)) {
       # The new owner is non-zero and different from the one in the database
       $mysqli->query("update device set user_id=$newid where lpad(hex(mac),12,'0') = '$mac'");
       $did = $newid;
+   }
+   if (($newdsc <> '') && ($newdsc <> $descr)) {
+      # Ditto for the description
+      $mysqli->query("update device set description='$newdsc' where lpad(hex(mac),12,'0') = '$mac'");
+      $descr = $newdsc;
    }
    if ($remove == '') {
       echo "<tr><td><select name=\"o_$mac\">\n";
@@ -74,10 +88,17 @@ while($obj = $res->fetch_object()) {
          echo ">$name</option>\n";
       }
       $dis_mac = rtrim(strtolower(chunk_split($mac,2,'-')),'-');
-      echo "</select></td><td><div title=\"$label\">$vendor</div></td><td>$dis_mac</td><td>$ip</td><td>$first</td>\n";
+      echo "</select></td><td><div title=\"$label\">$vendor</div></td>";
+      echo "<td><input type=\"text\" value=\"$descr\" name=\"l_$mac\"></td>";
+      echo "<td>$dis_mac</td><td>$ip</td><td>$first</td>\n";
       echo "<td><input type=\"checkbox\" name=\"d_$mac\" value=\"d_$mac\"></td></tr>\n";
    } else {
       $kill_list .= "x'$mac',";
+      # Get the mac out of the leases file
+      $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
+      $result = socket_connect($sock,'127.0.0.1',5000);
+      $buf = "k$mac\n";
+      socket_write($sock,$buf,strlen($buf));
    }
 }
 $kill_list = rtrim($kill_list,',');

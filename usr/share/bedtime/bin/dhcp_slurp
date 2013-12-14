@@ -1,13 +1,14 @@
 #!/usr/bin/perl
+
 BEGIN {push @INC,'/usr/share/bedtime/bin'}
 
-use BedtimeDB;
+use BedtimeDB qw(dbconn get_val);
 use DBI;
 use strict;
 
 # Connect to the database and get the leases file
-my $dbh = &BedtimeDB::dbconn;
-my $lease_f = &BedtimeDB::get_val('dhcp_leases');
+my $dbh = dbconn;
+my $lease_f = get_val('dhcp_leases');
 
 # Read the leases file into @lease
 open (LEASE,$lease_f);

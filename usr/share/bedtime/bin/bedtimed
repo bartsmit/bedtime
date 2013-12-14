@@ -52,6 +52,9 @@ while ( my $client = $socket->accept() ) {
    } elsif ($input =~ /^r/) {
       $input =~ s/^r//;
       system("/usr/share/bedtime/bin/restore $input");
+   } elsif ($input =~ /^k/) {
+      $input =~ s/^k//;
+      system("/usr/share/bedtime/bin/killmac $input");
    }
    close $client;
 }

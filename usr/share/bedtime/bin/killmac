@@ -1,0 +1,37 @@
+#!/usr/bin/perl
+
+BEGIN {push @INC,'/usr/share/bedtime/bin'}
+
+use BedtimeDB qw(get_val);
+use DBI;
+use warnings;
+use strict;
+
+my $kmac = $ARGV[0];
+
+# Change to colon delimited lowercase MAC
+$kmac = join(':',( lc($kmac) =~ m/../g ));
+
+# Connect to the database and get the leases file
+my $lease_f = get_val('dhcp_leases');
+
+# Read the leases file into @lease
+open (LEASE,$lease_f);
+my @lease = <LEASE>; close(LEASE);
+
+# Make lease array one long string and split on lease
+my @devs = split(/lease\s+/,join("\n",@lease));
+my $newleases = '';
+
+foreach my $dev (@devs) {
+   # See if this lease is to be kept
+   $dev =~ s/\n\n/\n/g;
+   $newleases .= "lease $dev" unless ($dev =~ m/hardware ethernet $kmac/);
+}
+# Remove lease decrlartions on comment lines
+$newleases =~ s/lease\s+#/#/g;
+
+# Write the leases file back
+open (LEASE,">$lease_f");
+print LEASE "$newleases\n";
+close (LEASE);
