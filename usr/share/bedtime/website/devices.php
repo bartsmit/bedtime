@@ -38,37 +38,77 @@ if ($numrows > 0) {
 } else {
    header("Location: addchild.php");
 }
+
+if (isset($_GET['sortdev'])) {
+   $sortdev = $_GET["sortdev"];
+   $mysqli->query("replace into settings values('sortdev','$sortdev')");
+} 
+
+if (isset($_GET['dirdev'])) {
+   $dirdev = $_GET['dirdev'];
+   $mysqli->query("replace into settings values('dirdev','$dirdev')");
+}
+
+$sortopts = array(
+'owner' => 'owner',
+'make'  => 'make',
+'descr' => 'description',
+'mac'   => 'mac address',
+'ip'    => 'ip address',
+'first' => 'first seen');
+
 echo "<html><head><title>Manage Devices</title>\n";
 echo "<link rel=\"stylesheet\" type=\"text/css\" href=\"desktop.css\"></head><body><h1>Devices</h1>\n";
-echo "Assign a child to each device from the drop-down list. Delete devices that are no longer around<br>\n";
-$sql  = "select inet_ntoa(ip) as ip,
-         (select name from child where device.user_id = child.user_id) as owner,
-         (select short from manufacturers where
-            (manufacturers.mac & x'FFFFFF000000') = (device.mac & x'FFFFFF000000') or
-            (manufacturers.mac & x'FFFFFFFFF000') = (device.mac & x'FFFFFFFFF000')) as vendor,
-         (select description from manufacturers where
-            (manufacturers.mac & x'FFFFFF000000') = (device.mac & x'FFFFFF000000') or
-            (manufacturers.mac & x'FFFFFFFFF000') = (device.mac & x'FFFFFFFFF000')) as label,
-         lpad(hex(mac),12,'0') as mac,
-         first_seen  as first,
-         description as descr,
-         user_id as id from device;";
+echo "Assign a child to each device from the drop-down list. Delete devices that are no longer around\n";
+echo "<br><br><form name=\"devices\">\n";
+echo "Sort device list by <select name=\"sortdev\">\n";
+$res = $mysqli->query("select value from settings where variable='sortdev'");
+$row = $res->fetch_assoc();
+$sortdev = $row['value'];
+foreach ($sortopts as $key => $opt) {
+   $sel = ($key == $sortdev) ? ' selected ' : '';
+   echo "<option value=\"$key\"$sel>$opt</option>\n";
+}
+echo "</select>\n";
+$res = $mysqli->query("select value from settings where variable='dirdev'");
+$row = $res->fetch_assoc();
+$dirdev = $row['value'];
+echo "<input type=\"radio\" name=\"dirdev\" value=\"ascending\"";
+if ($dirdev == 'ascending') { echo " checked=\"checked\" "; }
+echo "/> Ascending ";
+echo "<input type=\"radio\" name=\"dirdev\" value=\"descending\"";
+if ($dirdev == 'descending') { echo " checked=\"checked\" "; }
+echo "/> Descending<br>\n";
+if ((isset($sortdev)) && (isset($dirdev))) {
+   $dir  = (substr($dirdev,0,4) == 'desc') ? ' desc' : '';
+   $sort = " order by $sortdev".$dir;
+} else {
+   $sort = '';
+}
+$sql = "select inet_ntoa(ip) as ip,
+        (select name from child where device.user_id = child.user_id) as owner,
+        manu as make,
+        lpad(hex(mac),12,'0') as mac,
+        first_seen  as first,
+        description as descr,
+        user_id as id from device $sort;";
 $res = $mysqli->query($sql);
-echo "<form name=\"devices\"><table borders=\"0\">\n";
-echo "<th>Owner</th><th>Make</th><th>Description</th><th>MAC</th><th>IP address</th><th>First seen</th><th>Delete</th>\n";
+echo "<table borders=\"0\"><th>Owner</th><th>Make</th><th>Description</th>";
+echo "<th>MAC</th><th>IP address</th><th>First seen</th><th>Delete</th>\n";
 $kill_list = '';
 while($obj = $res->fetch_object()) {
    $did    = $obj->id;
    $owner  = $obj->owner;
    $mac    = $obj->mac;
    $ip     = $obj->ip;
-   $vendor = $obj->vendor;
-   $label  = $obj->label;
+   $label  = preg_replace('/\|/',',',$obj->make);
    $first  = $obj->first;
    $descr  = $obj->descr;
    $newid  = (isset($_GET["o_$mac"])) ? $_GET["o_$mac"] : '';
    $remove = (isset($_GET["d_$mac"])) ? $_GET["d_$mac"] : '';
    $newdsc = (isset($_GET["l_$mac"])) ? $_GET["l_$mac"] : '';
+   $bits   = explode("|",$obj->make);
+   $vendor = substr(preg_replace('/\s+|,/','',$bits[0]),0,8);
    if (($newid <> '') && ($newid <> $did)) {
       # The new owner is non-zero and different from the one in the database
       $mysqli->query("update device set user_id=$newid where lpad(hex(mac),12,'0') = '$mac'");
@@ -104,9 +144,7 @@ while($obj = $res->fetch_object()) {
 $kill_list = rtrim($kill_list,',');
 $res = $mysqli->query("delete from device where mac in ($kill_list)");
 ?>
-</table><br>
-Press submit to update devices.
-<input type="checkbox" name="manlst"> also update manufacturers list (may take a minute)<br><hr>
+</table><br>Press submit to update devices.<hr>
 <input type="submit" value="submit">
 </form>
 <a href="index.php">return</a><br>

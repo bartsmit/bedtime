@@ -3,7 +3,9 @@
 BEGIN {push @INC,'/usr/share/bedtime/bin'}
 
 use BedtimeDB qw(dbconn get_val);
+use LWP::Simple qw(get);
 use DBI;
+use warnings;
 use strict;
 
 # Connect to the database and get the leases file
@@ -45,12 +47,11 @@ foreach my $dev (@devs) {
 while ((my $mac, my $ip)=each(%new)) {
    my $sth = $dbh->prepare("select count(*) from device where lpad(hex(mac),12,'0')=lpad('$mac',12,'0');") or die "Cannot prepare query: $dbh->errstr";
    my $res = $sth->execute or die "Cannot execute query: $sth->errstr";
-   my $sql;
-   if ($sth->fetchrow_array() > 0) {
-      $sql = "update device set ip=inet_aton('$ip') where lpad(hex(mac),12,'0')=lpad('$mac',12,'0');";
-   } else {
-      $sql = "insert into device set mac=x'$mac', ip=inet_aton('$ip'), first_seen=now();";
-   }
+   # API key is set to return pipe symbol delimiters (|)
+   my $man = get("http://www.macvendorlookup.com/api/BTxGCNx/$mac");
+   # Take out empty fields
+   $man =~ s/(\|\s*)+\|/\|/g;
+   my $sql = "replace into device set mac=x'$mac', ip=inet_aton('$ip'), manu='$man', first_seen=now();";
    $res = $sth->finish;
    $sth = $dbh->prepare($sql) or die "Cannot prepare query: $dbh->errstr";
    $res = $sth->execute or die "Cannot execute query: $sth->errstr";

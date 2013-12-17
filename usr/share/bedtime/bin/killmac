@@ -35,3 +35,12 @@ $newleases =~ s/lease\s+#/#/g;
 open (LEASE,">$lease_f");
 print LEASE "$newleases\n";
 close (LEASE);
+
+# Restart dhcp
+if (-e "/etc/init.d/dhcpd") {
+   system("/etc/init.d/dhcpd restart");
+} elsif (-e  "/etc/init.d/networking") {
+   system("/etc/init.d/networking restart");
+} elsif (`hash systemctl` eq '') {
+   system("systemctl restart dhcpd.service");
+}
