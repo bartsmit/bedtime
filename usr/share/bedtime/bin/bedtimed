@@ -30,14 +30,15 @@ open  PID, ">/var/run/bedtimed.pid" or exec("logger Cannot open pid file: $!");
 print PID  "$$\n" or exec("logger Cannot write to pid file: $!");
 close PID;
 
-# Launch scripts according to socket input
+# Launch scripts according to socket input (u d m n o s p t r k)
 while ( my $client = $socket->accept() ) {
    chomp ( my $input = <$client> );
    system("logger socket 5000 received $input");
    system("/usr/share/bedtime/bin/update_ipt") if $input =~ /^u/;
    system("/usr/share/bedtime/bin/dhcp_slurp") if $input =~ /^d/;
    system("/usr/share/bedtime/bin/get_manlst") if $input =~ /^m/;
-   system("/usr/share/bedtime/bin/survey_net") if $input =~ /^s/;
+   system("/usr/share/bedtime/bin/new_ver")    if $input =~ /^n/;
+   system("/usr/share/bedtime/bin/old_ver")    if $input =~ /^o/;
    if ($input =~ /^s/) {
       $input =~ s/^s//;
       system("/usr/share/bedtime/bin/survey_net $input")

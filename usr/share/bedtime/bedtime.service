@@ -1,0 +1,9 @@
+[Unit]
+Description=Bedtime
+
+[Service]
+Type=forking
+ExecStart=/usr/share/bedtime/bin/bedtimed
+
+[Install]
+WantedBy=multi-user.target

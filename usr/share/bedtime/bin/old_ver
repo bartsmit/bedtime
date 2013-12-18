@@ -1,0 +1,11 @@
+#!/usr/bin/perl
+
+BEGIN {push @INC,'/usr/share/bedtime/bin'}
+
+use BedtimeDB qw(get_val set_val);
+use warnings;
+use strict;
+
+my $rpm = get_val('rpm');
+system("rpm -U --force /root/bedtime-$rpm.noarch.rpm");
+set_val('version',$rpm);

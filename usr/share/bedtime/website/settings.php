@@ -136,12 +136,33 @@ if (($mytwn != '') && (strpos($mytwn, $myreg)!== false)) {
 <form action="restore.php" method="post" enctype="multipart/form-data">
 Restore from: <input type="file" name="dump" size="40" />
 <input type="submit" name="submit" value="Restore" /></form>
+<?php
+$res = squery("select value from settings where variable='version'",$mysqli);
+$ver = $res['value'];
+$res = squery("select value from settings where variable='rpm'",$mysqli);
+$rpm = $res['value'];
+$filepage = file_get_contents("http://sourceforge.net/projects/bedtime/files/");
+preg_match('/bedtime([0-9]|\.|-)+tgz/',$filepage,$matches);
+$latest = $matches[0];
+preg_match("/href=\"http:\/\/(sourceforge\.net|sf\.net)\/projects\/bedtime\/files\/$latest\/download\"/",$filepage,$matches);
+$latest = preg_replace('/bedtime-|\.tgz/','',$latest);
+$url = $matches[0];
+$url = preg_replace('/^href=\"|\"$/','',$url);
+$res = squery("replace into settings (variable,value) values('latest','$latest'), ('latest_url','$url')",$mysqli);
+if ($latest <> $ver) {
+   echo "<hr><h2>Upgrade</h2>There is a newer version of bedtime ($latest).<br>\n";
+   echo "Make sure you back up before you <a href=\"upgrade.php\">upgrade.</a>\n";
+}
+if ($rpm <> $ver) {
+   echo "<hr><h2>Downgrade</h2>If you are having trouble with this version($ver).<br>\n";
+   echo "You can <a href=\"downgrade.php\">downgrade</a> to version $rpm.\n";
+   echo "Make a backup before you do so.\n";
+}
+?>
 <hr>
 <a href="index.php">return</a><br>
 Or <a href="logout.html">log out</a> of Bedtime<br><br>
 <?php
-$res = squery("select value from settings where variable='version'",$mysqli);
-$ver = $res['value'];
 echo "<div class=\"version\">\n";
 echo "<p>Bedtime version $ver</p>\n";
 echo "</div>\n";

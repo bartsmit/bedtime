@@ -1,0 +1,14 @@
+#!/usr/bin/perl
+
+BEGIN {push @INC,'/usr/share/bedtime/bin'}
+
+use BedtimeDB qw(get_val set_val);
+use warnings;
+use strict;
+
+my $latest = get_val('latest');
+if ((-e "/tmp/bedtime-$latest.tgz") && !(get_val('version') eq $latest)) {
+   system("tar xzf /tmp/bedtime-$latest.tgz -C / --strip-components=1");
+   system("bash /usr/share/bedtime/upgrade.sh") if (-e "/usr/share/bedtime/upgrade.sh");
+   set_val('version',$latest);
+}

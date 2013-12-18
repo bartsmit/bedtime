@@ -6,6 +6,12 @@ use warnings;
 use strict;
 use BedtimeDB qw(get_val set_val long2ip ip2long);
 
+# This doesn't belong here but saves a script
+my $rpm = `rpm -q bedtime`;
+chomp $rpm;
+$rpm =~ s/^bedtime-|\.noarch$//g;
+set_val('rpm',$rpm);
+
 # Pick up the variables from the database
 my $mask = get_val('mask');
 my $myip = get_val('myip');
