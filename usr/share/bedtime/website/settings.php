@@ -37,6 +37,22 @@ $row = $res->fetch_assoc();
 if ($row['num']==0) {
    $mysqli->query("insert into parent (name,password) values('admin',md5('admin'))");
 }
+$res = $mysqli->query("select hol_id from holiday");
+$kill = '';
+while ($row = $res->fetch_assoc()) {
+   $id = $row['hol_id'];
+   if (isset($_GET["hd_$id"])) {
+      $kill = $kill."$id,";
+   }
+}
+$kill = rtrim($kill,',');
+$mysqli->query("delete from holiday where hol_id in($kill)");
+$newhol = (isset($_GET['hname'])) ? $_GET['hname'] : '';
+$start  = (isset($_GET['hstrt'])) ? $_GET['hstrt'] : '';
+$stop   = (isset($_GET['hstop'])) ? $_GET['hstop'] : '';
+if ((! ($newhol == '')) && (! ($start == '')) && (! ($stop == ''))) {
+   $mysqli->query("insert into holiday (name,start,stop) values('$newhol','$start','$stop')");
+}
 if (isset($_GET['we_start'])) {
     $we_st = $_GET['we_start'];
     $mysqli->query("update settings set value='$we_st' where variable='weekend'");
@@ -67,6 +83,29 @@ while($obj = $res->fetch_object()) {
 }
 echo "</table><br>Add Parent<br>Name <input type=\"text\" name=\"name\"> Description ";
 echo "<input type=\"text\" name=\"desc\"> Password <input type=\"password\" name=\"pass\"><hr>\n";
+echo "<h2>School Holidays</h2><table borders=\"0\">\n";
+echo "<th>Holiday</th><th>Start date</th><th>End date</th><th>Delete</th>\n";
+$hols = array();
+$res = $mysqli->query("select name, start, stop, hol_id from holiday");
+while($obj = $res->fetch_object()) {
+   $h_id  = $obj->hol_id;
+   $name  = $obj->name;
+   $strt  = $obj->start;
+   $stop  = $obj->stop;
+   $nstrt = (isset($_GET["hs_$id"])) ? $_GET["hs_$id"] : '';
+   $nstop = (isset($_GET["hf_$id"])) ? $_GET["hf_$id"] : '';
+   if (($nstrt <> '') && ($nstrt <> $strt)) {
+      $mysqli->query("update holiday set start='$nstrt' where hol_id=$h_id");
+   }
+   if (($nstop <> '') && ($nstop <> $stop)) {
+      $mysqli->query("update holiday set stop='$nstop' where hol_id=$h_id");
+   }
+   echo "<tr><td>$name</td><td><input type=\"text\" value=\"$strt\" name=\"hs_$h_id\" size=\"10\"></td>";
+   echo "<td><input type=\"text\" value=\"$stop\" name=\"hf_$h_id\" size=\"10\"></td>";
+   echo "<td><input type=\"checkbox\" name=\"hd_$h_id\" value=\"hd_$h_id\"></td></tr>\n";
+}
+echo "</table><br>Add Holiday<br>Name <input type=\"text\" name=\"hname\"> Start date (yyyy-mm-dd)";
+echo "<input type=\"text\" name=\"hstrt\"> End date (yyyy-mm-dd)<input type=\"text\" name=\"hstop\"><hr>\n";
 $weekdays = array(
 130 => "Monday",
 192 => "Tuesday",
@@ -130,8 +169,8 @@ if (($mytwn != '') && (strpos($mytwn, $myreg)!== false)) {
    echo "The timezone is set to $mytwn<br>\n";
 }
 ?>
-<br><br><input type="submit" value="Submit"> parent and settings changes.
-</form><hr><h2>Backup/Restore</h2>
+<br><br><input type="submit" value="Submit"> parent, holiday and settings changes.
+</form><br><hr><h2>Backup/Restore</h2>
 <a href="backup.php">backup</a><br>
 <form action="restore.php" method="post" enctype="multipart/form-data">
 Restore from: <input type="file" name="dump" size="40" />

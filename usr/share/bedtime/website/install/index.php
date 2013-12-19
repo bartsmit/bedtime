@@ -24,6 +24,10 @@ if (isset($_GET['sqlrootpw'])) {
             $mysqli = new mysqli('localhost','root','','mysql');
             $mysqli->query("update mysql.user set password=password('$rootpass') where user='root'");
             $mysqli->query("create database if not exists bedtime");
+            $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
+            $result = socket_connect($sock,'127.0.0.1',5000);
+            $buf = "c$rootpass\n";
+            socket_write($sock,$buf,strlen($buf));
             $pass = substr(md5(uniqid()), 0, 12);
             $mysqli->query("delete from mysql.user where user='sleepy'");
             $mysqli->query("grant all on bedtime.* to 'sleepy'@'localhost' identified by '$pass'");
@@ -68,7 +72,7 @@ if (isset($_GET['sqlrootpw'])) {
       $mesg = "Welcome to the Bedtime installation<br><br>\nYou set the MySQL root password during the installation of mysql server\n";
    } else {
       $empt = 1;
-      $mesg = "Your MySQL root password is empty. Please enter a new password twice";
+      $mesg = "Your MySQL root password is empty. Please enter a new password twice\nThis will also be your Linux root password";
    }
 }
 echo "<html><head><title>Bedtime Install</title></head><body>\n";

@@ -5,7 +5,7 @@ $user = $vals["dbuser"];
 $pass = $vals["dbpass"];
 date_default_timezone_set('UTC');
 $dt = date('Ymd-His');
-exec("mysqldump --compact --no-create-db -u $user -p$pass bedtime parent child device rules ground reward > /tmp/dump-$dt.sql");
+exec("mysqldump --compact --no-create-db -u $user -p$pass bedtime parent child device rules holiday ground reward > /tmp/dump-$dt.sql");
 $zip = new ZipArchive;
 $res = $zip->open("/tmp/dump-$dt.zip", ZipArchive::CREATE);
 $zip->addFile("/tmp/dump-$dt.sql","dump-$dt.sql");
