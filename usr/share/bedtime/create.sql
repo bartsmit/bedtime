@@ -1,236 +1,73 @@
--- MySQL dump 10.13  Distrib 5.1.69, for redhat-linux-gnu (i386)
---
--- Host: localhost    Database: bedtime
--- ------------------------------------------------------
--- Server version	5.1.69
+create database if not exists bedtime;
 
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+use bedtime;
 
---
--- Current Database: `bedtime`
---
+drop table if exists child;
+create table child (
+   user_id     mediumint(9) not null auto_increment comment 'glue record between tables',
+   name        varchar(32)  not null                comment 'The name of your child',
+   description varchar(128)                         comment 'Optional description',
+   primary key (user_id)
+) engine=MyISAM default charset=latin1 comment 'Maps child name to description and ID';
 
-/*!40000 DROP DATABASE IF EXISTS `bedtime`*/;
+drop table if exists device;
+create table device (
+   mac         bigint(24)       not null     comment 'MAC address. Select with hex(mac), insert with conv(''MAC'',16,10)',
+   description varchar(128)     default null comment 'Optional description',
+   user_id     mediumint(9)     not null     comment 'glue record between tables',
+   first_seen  datetime         not null     comment 'When it showed up in dhcp',
+   ip          int(10) unsigned default null comment 'IP address from dhcp',
+   manu        varchar(256)     default null comment 'OID manufacturer data'
+) engine=MyISAM default charset=latin1 comment 'Maps device MAC address to user ID and description with IP';
 
-CREATE DATABASE /*!32312 IF NOT EXISTS*/ `bedtime` /*!40100 DEFAULT CHARACTER SET latin1 */;
+drop table if exists ground;
+create table ground (
+   user_id mediumint(9) not null comment 'ID of the miscreant',
+   start   datetime     not null comment 'Time their punishment starts',
+   end     datetime     not null comment 'Time they are off the hook again'
+) engine=MyISAM default charset=latin1 comment 'Ground rules take precedent over bedtimes and rewards';
 
-USE `bedtime`;
+drop table if exists reward;
+create table reward (
+   user_id mediumint(9) not null comment 'ID of the little angel',
+   start   datetime     not null comment 'Time their treat starts',
+   end     datetime     not null comment 'Time they are back to normal'
+) engine=MyISAM default charset=latin1 comment 'Sometimes you just want to be the cool parent';
 
---
--- Table structure for table `child`
---
+drop table if exists holiday;
+create table holiday (
+   hol_id mediumint(9) not null auto_increment comment 'Internal ID for holidays',
+   name   varchar(64)  not null                comment 'Name of the school holiday',
+   start  date         not null                comment 'Lazy mornings start here',
+   stop   date         not null                comment 'Oh well, it did not last forever',
+   primary key (hol_id)
+) engine=MyISAM default charset=latin1 comment 'Holidays is when there are no school nights';
 
-DROP TABLE IF EXISTS `child`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `child` (
-  `user_id` mediumint(9) NOT NULL AUTO_INCREMENT COMMENT 'glue record between tables',
-  `name` varchar(32) NOT NULL COMMENT 'The child''s name. Why are you even looking this up?',
-  `description` varchar(128) DEFAULT NULL COMMENT 'Description',
-  PRIMARY KEY (`user_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COMMENT='maps child name to description and ID';
-/*!40101 SET character_set_client = @saved_cs_client */;
+drop table if exists parent;
+create table parent (
+   name        varchar(32)  not null                comment 'Login name of the parent',
+   password    varchar(128) not null                comment 'Scrambled pass phrase',
+   description varchar(128) not null                comment 'Optional description',
+   parent_id   mediumint(9) not null auto_increment comment 'Internal ID for parents',
+   primary key (parent_id)
+) engine=MyISAM default charset=latin1 comment 'Authentication table for parent logins';
 
---
--- Dumping data for table `child`
---
+insert into parent (name,password,description) values('admin',md5('admin'),'delete me');
 
-LOCK TABLES `child` WRITE;
-/*!40000 ALTER TABLE `child` DISABLE KEYS */;
-/*!40000 ALTER TABLE `child` ENABLE KEYS */;
-UNLOCK TABLES;
+drop table if exists rules;
+create table rules (
+   user_id mediumint(9)        not null               comment 'glue record between tables',
+   night   time                not null               comment 'Bedtime, the pivotal data',
+   morning time                not null               comment 'Time to get up',
+   days    tinyint(3) unsigned not null default '254' comment 'Byte flag for days 0-Mon 7-Sun'
+) engine=MyISAM default charset=latin1 comment 'This is the bread and butter of the project';
 
---
--- Table structure for table `device`
---
+drop table if exists settings;
+create table settings (
+   variable varchar(16) not null comment 'name of the variable - duh',
+   value    varchar(64) not null comment 'and the free text value'
+) engine=MyISAM default charset=latin1 comment 'Miscellaneous settings for internal use';
 
-DROP TABLE IF EXISTS `device`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `device` (
-  `mac` bigint(24) NOT NULL COMMENT 'MAC address. Select with hex(mac). Insert with conv(''00FF3A55FFDD'',16,10)',
-  `description` varchar(128) DEFAULT NULL COMMENT 'Description',
-  `user_id` mediumint(9) NOT NULL DEFAULT '0' COMMENT 'ID of the child using the device',
-  `first_seen` datetime NOT NULL,
-  `ip` int(10) unsigned DEFAULT NULL,
-  `manu` varchar(256) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COMMENT='maps device MAC address to user ID and description';
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `device`
---
-
-LOCK TABLES `device` WRITE;
-/*!40000 ALTER TABLE `device` DISABLE KEYS */;
-/*!40000 ALTER TABLE `device` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `ground`
---
-
-DROP TABLE IF EXISTS `ground`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `ground` (
-  `user_id` mediumint(9) NOT NULL COMMENT 'ID of the miscreant',
-  `start` datetime NOT NULL COMMENT 'time their punishment starts',
-  `end` datetime NOT NULL COMMENT 'time they are off the hook again',
-  PRIMARY KEY (`user_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COMMENT='Rules in this table take precedence of bedtimes and rewards';
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `ground`
---
-
-LOCK TABLES `ground` WRITE;
-/*!40000 ALTER TABLE `ground` DISABLE KEYS */;
-/*!40000 ALTER TABLE `ground` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `holiday`
---
-
-DROP TABLE IF EXISTS `holiday`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `holiday` (
-  `hol_id` mediumint(9) NOT NULL AUTO_INCREMENT,
-  `name` varchar(64) NOT NULL COMMENT 'Name of the school holiday',
-  `start` date NOT NULL COMMENT 'Start date',
-  `stop` date NOT NULL COMMENT 'End date',
-  PRIMARY KEY (`hol_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COMMENT='Holidays when there are no school nights';
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `holiday`
---
-
-LOCK TABLES `holiday` WRITE;
-/*!40000 ALTER TABLE `holiday` DISABLE KEYS */;
-/*!40000 ALTER TABLE `holiday` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `parent`
---
-
-DROP TABLE IF EXISTS `parent`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `parent` (
-  `name` varchar(32) NOT NULL COMMENT 'Login name of the parent',
-  `password` char(128) NOT NULL COMMENT 'Pass phrase for the parent',
-  `description` varchar(128) DEFAULT NULL COMMENT 'Optional description',
-  `parent_id` int(11) NOT NULL AUTO_INCREMENT,
-  PRIMARY KEY (`parent_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COMMENT='Authentication table for controlling the app';
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `parent`
---
-
-LOCK TABLES `parent` WRITE;
-/*!40000 ALTER TABLE `parent` DISABLE KEYS */;
-INSERT INTO `parents` VALUES ('admin',md5('admin'),'delete me');
-/*!40000 ALTER TABLE `parent` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `reward`
---
-
-DROP TABLE IF EXISTS `reward`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `reward` (
-  `user_id` mediumint(9) NOT NULL COMMENT 'user ID of the little angel',
-  `start` datetime NOT NULL COMMENT 'start of the guaranteed device use',
-  `end` datetime NOT NULL COMMENT 'All good things must come to an end',
-  PRIMARY KEY (`user_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COMMENT='Free use of the devices as a reward';
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `reward`
---
-
-LOCK TABLES `reward` WRITE;
-/*!40000 ALTER TABLE `reward` DISABLE KEYS */;
-/*!40000 ALTER TABLE `reward` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `rules`
---
-
-DROP TABLE IF EXISTS `rules`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `rules` (
-  `user_id` mediumint(9) NOT NULL COMMENT 'The user ID of the child with this bedtime rule',
-  `night` time NOT NULL COMMENT 'The time to go to bed',
-  `morning` time NOT NULL COMMENT 'The time the device is released again',
-  `days` tinyint(3) unsigned NOT NULL DEFAULT '254' COMMENT 'Byte flag of the days 0-Mon 7-Sun'
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COMMENT='The bread and butter';
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `rules`
---
-
-LOCK TABLES `rules` WRITE;
-/*!40000 ALTER TABLE `rules` DISABLE KEYS */;
-/*!40000 ALTER TABLE `rules` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `settings`
---
-
-DROP TABLE IF EXISTS `settings`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `settings` (
-  `variable` varchar(16) NOT NULL COMMENT 'name of the variable - duh',
-  `value` varchar(64) NOT NULL COMMENT 'and the free text value',
-  PRIMARY KEY (`variable`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COMMENT='Miscellaneous settings for bedtime itself';
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `settings`
---
-
-LOCK TABLES `settings` WRITE;
-/*!40000 ALTER TABLE `settings` DISABLE KEYS */;
-INSERT INTO `settings` VALUES ('weekend','12');
-INSERT INTO `settings` VALUES ('rpm','1.1-0');
-INSERT INTO `settings` VALUES ('version','1.1-0');
-/*!40000 ALTER TABLE `settings` ENABLE KEYS */;
-UNLOCK TABLES;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2013-12-19 14:04:57
+insert into settings values('weekend','12');
+insert into settings values('rpm','1.1-0');
+insert into settings values('version','1.1-0');
