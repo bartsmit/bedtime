@@ -73,6 +73,7 @@ if (`grep $myip /etc/sysconfig/network-scripts/ifcfg-$myif | wc -l` == 0) {
    open (CFG,">/etc/sysconfig/network-scripts/ifcfg-$myif");
    print CFG "DEVICE=$myif\n";
    print CFG "ONBOOT=yes\n";
+   print CFG "BOOTPROTO=static\n";
    print CFG "IPADDR=$myip\n";
    print CFG "PREFIX=$mask\n";
    print CFG "GATEWAY=$mydg\n";
