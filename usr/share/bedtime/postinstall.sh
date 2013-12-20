@@ -5,12 +5,13 @@ setsebool -P httpd_can_network_connect 1
 cp -f /usr/share/bedtime/iptables-config /etc/sysconfig
 cp -f /usr/share/bedtime/ip6tables-config /etc/sysconfig
 
-iptables -F FORWARD
-iptables -X FORWARD
-iptables -F OUTPUT
-iptables -X OUTPUT
-iptables -F INPUT
-iptables -X INPUT
+iptables -F
+iptables -X
+iptables -t nat -F
+iptables -t nat -X 
+iptables -t mangle -F
+iptables -t mangle -X
+
 iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 iptables -A INPUT -i lo -j ACCEPT
 iptables -A INPUT -p icmp -j ACCEPT
@@ -22,8 +23,13 @@ iptables -A INPUT -m conntrack --ctstate NEW -p udp -m udp --dport 67:68 -j ACCE
 iptables -A INPUT -j REJECT --reject-with icmp-host-prohibited
 iptables-save > /etc/sysconfig/iptables
 
-ip6tables -F FORWARD
-ip6tables -X FORWARD
+ip6tables -F
+ip6tables -X
+ip6tables -t nat -F
+ip6tables -t nat -X
+ip6tables -t mangle -F
+ip6tables -t mangle -X
+
 ip6tables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 ip6tables -A INPUT -i lo -j ACCEPT
 ip6tables -A INPUT -p ipv6-icmp -j ACCEPT

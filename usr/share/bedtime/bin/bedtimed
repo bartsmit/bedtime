@@ -67,7 +67,7 @@ while ( my $client = $socket->accept() ) {
       system("/usr/share/bedtime/bin/killmac $input");
    } elsif ($input =~ /^c/) {
       $input =~ s/^c//;
-      system("echo "root:$input" | chpasswd");
+      system("echo \"root:$input\" | chpasswd");
    }
    close $client;
 }

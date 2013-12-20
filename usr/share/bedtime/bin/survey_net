@@ -61,8 +61,10 @@ my %seen;
 my $dhcp = pop(@servers);
 
 # Find the default gateway
-my $dg = `route -n | grep '^0.0.0.0' | awk '{ print \$2 }'`;
-chomp $dg;
+my $dg = `ip route | grep default`;
+$dg =~ m/^default via\s+(\d{1,3}\.){3}(\d{1,3})/;
+$dg = $&;
+$dg =~ s/^default via\s+//;
 
 # Write the result in the network file
 open (OUT, ">/usr/share/bedtime/network");
