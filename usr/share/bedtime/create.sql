@@ -17,7 +17,8 @@ create table device (
    user_id     mediumint(9)     not null     comment 'glue record between tables',
    first_seen  datetime         not null     comment 'When it showed up in dhcp',
    ip          int(10) unsigned default null comment 'IP address from dhcp',
-   manu        varchar(256)     default null comment 'OID manufacturer data'
+   manu        varchar(256)     default null comment 'OID manufacturer data',
+   primary key (mac)
 ) engine=MyISAM default charset=latin1 comment 'Maps device MAC address to user ID and description with IP';
 
 drop table if exists ground;
@@ -65,7 +66,8 @@ create table rules (
 drop table if exists settings;
 create table settings (
    variable varchar(16) not null comment 'name of the variable - duh',
-   value    varchar(64) not null comment 'and the free text value'
+   value    varchar(64) not null comment 'and the free text value',
+   primary key (variable)
 ) engine=MyISAM default charset=latin1 comment 'Miscellaneous settings for internal use';
 
 insert into settings values('weekend','12');
