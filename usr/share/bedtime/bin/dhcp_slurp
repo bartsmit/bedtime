@@ -49,9 +49,11 @@ while ((my $mac, my $ip)=each(%new)) {
    my $res = $sth->execute or die "Cannot execute query: $sth->errstr";
    # API key is set to return pipe symbol delimiters (|)
    my $man = get("http://www.macvendorlookup.com/api/BTxGCNx/$mac");
+   # Substitute an empty string for a null value
+   $man = '' unless defined($man);
    # Take out empty fields
    $man =~ s/(\|\s*)+\|/\|/g;
-   my $sql = "replace into device set mac=x'$mac', ip=inet_aton('$ip'), manu='$man', first_seen=now();";
+   my $sql = "replace into device set mac=conv('$mac',16,10), ip=inet_aton('$ip'), manu='$man', first_seen=now();";
    $res = $sth->finish;
    $sth = $dbh->prepare($sql) or die "Cannot prepare query: $dbh->errstr";
    $res = $sth->execute or die "Cannot execute query: $sth->errstr";

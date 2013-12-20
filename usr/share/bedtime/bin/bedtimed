@@ -30,13 +30,22 @@ open  PID, ">/var/run/bedtimed.pid" or exec("logger Cannot open pid file: $!");
 print PID  "$$\n" or exec("logger Cannot write to pid file: $!");
 close PID;
 
-# Launch scripts according to socket input (u d m n o s p t r k)
+# Launch scripts according to input:
+# u = update iptables
+# d = dhcp leases to db
+# n = upgrade from tarball
+# o = downgrade to rpm
+# s = survey the network
+# p = password into conf
+# t = timezone config
+# r = restore database
+# k = kill stale mac
+# c = change root pass
 while ( my $client = $socket->accept() ) {
    chomp ( my $input = <$client> );
    system("logger socket 5000 received $input");
    system("/usr/share/bedtime/bin/update_ipt") if $input =~ /^u/;
    system("/usr/share/bedtime/bin/dhcp_slurp") if $input =~ /^d/;
-   system("/usr/share/bedtime/bin/get_manlst") if $input =~ /^m/;
    system("/usr/share/bedtime/bin/new_ver")    if $input =~ /^n/;
    system("/usr/share/bedtime/bin/old_ver")    if $input =~ /^o/;
    if ($input =~ /^s/) {
@@ -56,6 +65,9 @@ while ( my $client = $socket->accept() ) {
    } elsif ($input =~ /^k/) {
       $input =~ s/^k//;
       system("/usr/share/bedtime/bin/killmac $input");
+   } elsif ($input =~ /^c/) {
+      $input =~ s/^c//;
+      system("echo "root:$input" | chpasswd");
    }
    close $client;
 }

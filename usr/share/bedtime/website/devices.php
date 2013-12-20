@@ -18,14 +18,6 @@ $result = socket_connect($sock,'127.0.0.1',5000);
 $buf = "u\n";
 socket_write($sock,$buf,strlen($buf));
 
-
-if (isset($_GET["manlst"])) {
-   $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
-   $buf = "m\n";
-   $result = socket_connect($sock,'127.0.0.1',5000);
-   socket_write($sock,$buf,strlen($buf));
-}
-
 $res = $mysqli->query("select user_id, name from child order by name");
 $numrows = $res->num_rows;
 if ($numrows > 0) {

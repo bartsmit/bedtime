@@ -57,14 +57,12 @@ DROP TABLE IF EXISTS `device`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `device` (
-  `mac` bigint(24) NOT NULL COMMENT 'MAC address. Select with select hex(mac). Insert like values (x''00FF3A55FFDD'')',
+  `mac` bigint(24) NOT NULL COMMENT 'MAC address. Select with hex(mac). Insert with conv(''00FF3A55FFDD'',16,10)',
   `description` varchar(128) DEFAULT NULL COMMENT 'Description',
   `user_id` mediumint(9) NOT NULL DEFAULT '0' COMMENT 'ID of the child using the device',
   `first_seen` datetime NOT NULL,
   `ip` int(10) unsigned DEFAULT NULL,
-  `manu` varchar(256) DEFAULT NULL,
-  PRIMARY KEY (`mac`,`user_id`),
-  UNIQUE KEY `mac_UNIQUE` (`mac`)
+  `manu` varchar(256) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COMMENT='maps device MAC address to user ID and description';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -110,11 +108,11 @@ DROP TABLE IF EXISTS `holiday`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `holiday` (
   `hol_id` mediumint(9) NOT NULL AUTO_INCREMENT,
-  `name` varchar(64) NOT NULL,
-  `start` date NOT NULL,
-  `stop` date NOT NULL,
+  `name` varchar(64) NOT NULL COMMENT 'Name of the school holiday',
+  `start` date NOT NULL COMMENT 'Start date',
+  `stop` date NOT NULL COMMENT 'End date',
   PRIMARY KEY (`hol_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COMMENT='Holidays when there are no school nights';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -148,6 +146,7 @@ CREATE TABLE `parent` (
 
 LOCK TABLES `parent` WRITE;
 /*!40000 ALTER TABLE `parent` DISABLE KEYS */;
+INSERT INTO `parents` VALUES ('admin',md5('admin'),'delete me');
 /*!40000 ALTER TABLE `parent` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -220,6 +219,8 @@ CREATE TABLE `settings` (
 LOCK TABLES `settings` WRITE;
 /*!40000 ALTER TABLE `settings` DISABLE KEYS */;
 INSERT INTO `settings` VALUES ('weekend','12');
+INSERT INTO `settings` VALUES ('rpm','1.1-0');
+INSERT INTO `settings` VALUES ('version','1.1-0');
 /*!40000 ALTER TABLE `settings` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
