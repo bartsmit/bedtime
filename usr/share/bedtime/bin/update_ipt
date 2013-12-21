@@ -13,7 +13,6 @@ $iptv =~ s/^\s*iptables\s+v//;
 my ($maj,$min,$rel) = split(/\./,$iptv);
 my $bork = (($maj <= 1) && ($min <= 4) && ($rel <= 10)) ? 1 : 0;
 
-
 # Connect to the database
 my $dbh = &BedtimeDB::dbconn; my $sth;
 
@@ -37,27 +36,28 @@ $mask = $wknd if $sth->rows > 0;
 
 # Flush all FORWARD and PREROUTING iptables
 my $tables = "iptables -F FORWARD\niptables -t nat -F PREROUTING\n";
+my $sql;
 
 # Get the bedtime rules
 if ($bork) {
-   $sth = $dbh->prepare(
+   $sth=$dbh->prepare(
    "select lpad(hex(device.mac),12,'0') as mac,
    if (rules.night<'12:00:00',
-      concat_ws(' ',curdate()+interval 1 day, rules.night),
-      concat_ws(' ',curdate(),rules.night))
+      date_format(concat_ws(' ',curdate()+interval 1 day, rules.night),'%Y-%m-%dT%T'),
+      date_format(concat_ws(' ',curdate(),rules.night),'%Y-%m-%dT%T'))
    as start,
-   concat_ws(' ',curdate()+interval 1 day, rules.morning)
+   date_format(concat_ws(' ',curdate()+interval 1 day, rules.morning),'%Y-%m-%dT%T')
    as stop
    from rules inner join device on rules.user_id=device.user_id
    where days=$mask");
 } else {
-   $sth = $dbh->prepare(
+   $sth=$dbh->prepare(
    "select lpad(hex(device.mac),12,'0') as mac,
    if (rules.night<'12:00:00',
-      convert_tz(concat_ws(' ',curdate()+interval 1 day, rules.night),'$town','UTC'),
-      convert_tz(concat_ws(' ',curdate(),rules.night),'$town','UTC'))
+      date_format(convert_tz(concat_ws(' ',curdate()+interval 1 day, rules.night),'$town','UTC'),'%Y-%m-%dT%T'),
+      date_format(convert_tz(concat_ws(' ',curdate(),rules.night),'$town','UTC'),'%Y-%m-%dT%T'))
    as start,
-   convert_tz(concat_ws(' ',curdate()+interval 1 day, rules.morning),'$town','UTC')
+   date_format(convert_tz(concat_ws(' ',curdate()+interval 1 day, rules.morning),'$town','UTC'),'%Y-%m-%dT%T')
    as stop 
    from rules inner join device on rules.user_id=device.user_id
    where days=$mask");
@@ -67,8 +67,6 @@ $sth->execute();
 while (my @row = $sth->fetchrow_array) {
    my ($mac, $start, $stop) = (@row);
    $mac = join(':',( lc($mac) =~ m/../g ));
-   $start =~ s/ /T/;
-   $stop  =~ s/ /T/;
    $tables .= "iptables -A FORWARD -m mac --mac-source $mac ";
    $tables .= "-m time --datestart $start --datestop $stop ";
    $tables .= "--utc " unless ($bork);
@@ -84,10 +82,10 @@ if ($bork) {
    $sth = $dbh->prepare(
    "select lpad(hex(device.mac),12,'0') as mac,
    if (rules.night<'12:00:00',
-      concat_ws(' ',curdate(), rules.night),
-      concat_ws(' ',curdate()-interval 1 day,rules.night))
+      date_format(concat_ws(' ',curdate(), rules.night),'%Y-%m-%dT%T'),
+      date_format(concat_ws(' ',curdate()-interval 1 day,rules.night),'%Y-%m-%dT%T'))
    as start,
-   concat_ws(' ',curdate()+interval 1 day, rules.morning)
+   date_format(concat_ws(' ',curdate()+interval 1 day, rules.morning),'%Y-%m-%dT%T')
    as stop
    from rules inner join device on rules.user_id=device.user_id
    where days=$mask");
@@ -95,10 +93,10 @@ if ($bork) {
    $sth = $dbh->prepare(
    "select lpad(hex(device.mac),12,'0') as mac,
    if (rules.night<'12:00:00',
-      convert_tz(concat_ws(' ',curdate(), rules.night),'$town','UTC'),
-      convert_tz(concat_ws(' ',curdate()-interval 1 day,rules.night),'$town','UTC'))
+      date_format(convert_tz(concat_ws(' ',curdate(), rules.night),'$town','UTC'),'%Y-%m-%dT%T'),
+      date_format(convert_tz(concat_ws(' ',curdate()-interval 1 day,rules.night),'$town','UTC'),'%Y-%m-%dT%T'))
    as start,
-   convert_tz(concat_ws(' ',curdate(), rules.morning),'$town','UTC')
+   date_format(convert_tz(concat_ws(' ',curdate(), rules.morning),'$town','UTC'),'%Y-%m-%dT%T')
    as stop
    from rules inner join device on rules.user_id=device.user_id
    where days=$mask");
@@ -108,8 +106,6 @@ $sth->execute();
 while (my @row = $sth->fetchrow_array) {
    my ($mac, $start, $stop) = (@row);
    $mac = join(':',( lc($mac) =~ m/../g ));
-   $start =~ s/ /T/;
-   $stop  =~ s/ /T/;
    $tables .= "iptables -A FORWARD -m mac --mac-source $mac ";
    $tables .= "-m time --datestart $start --datestop $stop ";
    $tables .= "--utc " unless ($bork);
@@ -125,14 +121,14 @@ while (my @row = $sth->fetchrow_array) {
 if ($bork) {
    $sth = $dbh->prepare(
    "select lpad(hex(device.mac),12,'0') as mac,
-   start as begin,
-   end   as finish
+   date_format(start,'%Y-%m-%dT%T') as begin,
+   date_format(end  ,'%Y-%m-%dT%T') as finish
    from device inner join ground on device.user_id=ground.user_id");
 } else {
    $sth = $dbh->prepare(
    "select lpad(hex(device.mac),12,'0') as mac,
-   convert_tz(start,'$town','UTC') as begin,
-   convert_tz(end,  '$town','UTC') as finish
+   date_format(convert_tz(start,'$town','UTC'),'%Y-%m-%dT%T') as begin,
+   date_format(convert_tz(end,  '$town','UTC'),'%Y-%m-%dT%T') as finish
    from device inner join ground on device.user_id=ground.user_id");
 }
 $sth->execute();
@@ -140,8 +136,6 @@ $sth->execute();
 while (my @row = $sth->fetchrow_array) {
    my ($mac, $start, $stop) = (@row);
    $mac = join(':',( lc($mac) =~ m/../g ));
-   $start =~ s/ /T/;
-   $stop  =~ s/ /T/;
    $tables .= "iptables -I FORWARD 1 -m mac --mac-source $mac ";
    $tables .= "-m time --datestart $start --datestop $stop ";
    $tables .= "--utc " unless ($bork);
@@ -152,14 +146,14 @@ while (my @row = $sth->fetchrow_array) {
 if ($bork) {
    $sth = $dbh->prepare(
    "select lpad(hex(device.mac),12,'0') as mac,
-   start as begin,
-   end   as finish
+   date_format(start,'%Y-%m-%dT%T') as begin,
+   date_format(end  ,'%Y-%m-%dT%T') as finish
    from device inner join reward on device.user_id=reward.user_id");
 } else {
    $sth = $dbh->prepare(
    "select lpad(hex(device.mac),12,'0') as mac,
-   convert_tz(start,'$town','UTC') as begin,
-   convert_tz(end,  '$town','UTC') as finish
+   date_format(convert_tz(start,'$town','UTC'),'%Y-%m-%dT%T') as begin,
+   date_format(convert_tz(end,  '$town','UTC'),'%Y-%m-%dT%T') as finish
    from device inner join reward on device.user_id=reward.user_id");
 }
 $sth->execute();
@@ -167,8 +161,6 @@ $sth->execute();
 while (my @row = $sth->fetchrow_array) {
    my ($mac, $start, $stop) = (@row);
    $mac = join(':',( lc($mac) =~ m/../g ));
-   $start =~ s/ /T/;
-   $stop  =~ s/ /T/;
    $tables .= "iptables -I FORWARD 1 -m mac --mac-source $mac ";
    $tables .= "-m time --datestart $start --datestop $stop ";
    $tables .= "--utc " unless ($bork);

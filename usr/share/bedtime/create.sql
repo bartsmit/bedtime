@@ -57,10 +57,12 @@ insert into parent (name,password,description) values('admin',md5('admin'),'dele
 
 drop table if exists rules;
 create table rules (
-   user_id mediumint(9)        not null               comment 'glue record between tables',
-   night   time                not null               comment 'Bedtime, the pivotal data',
-   morning time                not null               comment 'Time to get up',
-   days    tinyint(3) unsigned not null default '254' comment 'Byte flag for days 0-Mon 7-Sun'
+   user_id mediumint(9)        not null                comment 'glue record between tables',
+   night   time                not null                comment 'Bedtime, the pivotal data',
+   morning time                not null                comment 'Time to get up',
+   days    tinyint(3) unsigned not null default '254'  comment 'Byte flag for days 0-Mon 7-Sun',
+   rule_id mediumint(9)        not null auto_increment comment 'Unique rule ID to allow key',
+   primary key (rule_id)
 ) engine=MyISAM default charset=latin1 comment 'This is the bread and butter of the project';
 
 drop table if exists settings;
