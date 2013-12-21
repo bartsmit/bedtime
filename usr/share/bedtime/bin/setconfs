@@ -67,17 +67,3 @@ if ((`httpd -v | grep Apache/2.4 | wc -l` > 0) &&
 $conf .= "Alias /bedtime /usr/share/bedtime/website\n";
 open (CONF, ">/etc/httpd/conf.d/bedtime.conf");
 print CONF "$conf"; close CONF;
-
-# Finally fix the Private Temp
-if (-e '/usr/lib/systemd/system/httpd.service') {
-   open(CONF, "/usr/lib/systemd/system/httpd.service");
-   @lines = <CONF>; close CONF;
-   foreach my $line (@lines) {
-      if (($line =~ m/PrivateTmp/) &&
-          ($line =~ m/true/i)) {
-         $conf .= "PrivateTmp=false";
-      } else {
-         $conf .= $line;
-      }
-   }
-}
