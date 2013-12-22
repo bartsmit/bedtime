@@ -46,6 +46,8 @@ if hash systemctl 2>/dev/null; then
    systemctl daemon-reload
    systemctl start mysqld.service
    systemctl enable mysqld.service
+   systemctl start mariadb.service
+   systemctl enable mariadb.service
    systemctl start squid.service
    systemctl enable squid.service
    systemctl start ntpd.service
