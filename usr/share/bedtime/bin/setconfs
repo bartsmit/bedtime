@@ -1,5 +1,8 @@
 #!/usr/bin/perl
 
+# This script sets the configuration files
+# for the Squid and Apache daemons
+
 use strict;
 use warnings;
 

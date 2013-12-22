@@ -1,8 +1,8 @@
 <?php
 session_start(); if (!isset($_SESSION["name"])) { header("location:login.php"); }
 include "dbconn.php";
-$res = squery("select value from settings where variable='rpm'",$mysqli);
-$rpm = $res['value'];
+$res = $mysqli->query("select value from settings where variable='rpm'");
+$row = $res->fetch_assoc(); $rpm = $row['value'];
 $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
 $result = socket_connect($sock,'127.0.0.1',5000);
 $buf = "o\n";

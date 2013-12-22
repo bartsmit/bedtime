@@ -1,31 +1,49 @@
 <?php
+/*
+This is the script for the main page
+The most often used items are shown:
+Bedtimes, ground and reward.
+All others are linked to other pages.
+*/
+
+# Use the parent security through login
 session_start(); if (!isset($_SESSION["name"])) { header("location:login.php"); }
+# Create a link to the database
 include "dbconn.php";
+# The top left set checkbox set the same times for all children
 $sall = (isset($_GET['sel_all']));
+# And the four times apply to all
 $awst = (isset($_GET['a_w_start']))   ? $_GET['a_w_start']   : '';
 $awnd = (isset($_GET['a_w_end']))     ? $_GET['a_w_end']     : '';
 $asst = (isset($_GET['a_s_start']))   ? $_GET['a_s_start']   : '';
 $asnd = (isset($_GET['a_s_end']))     ? $_GET['a_s_end']     : '';
+# Check the ground unit (hour,day,week or month)
 $grni = (isset($_GET['ground']))      ? $_GET['ground']      : '';
+# And the value of that unit
 $grnu = (isset($_GET['ground_num']))  ? $_GET['ground_num']  : '';
+# Alternatively give a set end time
 $grnt = (isset($_GET['ground_time'])) ? $_GET['ground_time'] : '';
+# And the end date
 $grnd = (isset($_GET['ground_date'])) ? $_GET['ground_date'] : '';
+# Same unit, value or end date/time of rewards
 $rewi = (isset($_GET['reward']))      ? $_GET['reward']      : '';
 $rewu = (isset($_GET['reward_num']))  ? $_GET['reward_num']  : '';
 $rewt = (isset($_GET['reward_time'])) ? $_GET['reward_time'] : '';
 $rewd = (isset($_GET['reward_date'])) ? $_GET['reward_date'] : '';
-
+# Remove old ground and reward lines
 $mysqli->query("delete from ground where end < now()");
 $mysqli->query("delete from reward where end < now()");
-
+# Run an update of the iptables
 $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
 $result = socket_connect($sock,'127.0.0.1',5000);
 $buf = "u\n";
 socket_write($sock,$buf,strlen($buf));
-
+# Check if we have four non-zero values for all
 $four = (($awst != '') && ($awnd != '') && ($asst != '') && ($asnd != ''));
-$res = squery("select value from settings where variable='weekend'",$mysqli);
-$weekend = $res['value']; $weekdays = 254 ^ $weekend;
+# Pick up the weekend and weekdays days masks from the database
+$res = $mysqli->query("select value from settings where variable='weekend'");
+$row = $res->fetch_assoc(); $weekend = $row['value']; $weekdays = 254 ^ $weekend;
+# Pick up the values for the children table
 $sql_lst = "select child.user_id,name,description,
             (select count(*) from ground where ground.user_id=rules.user_id) as gc,
             (select max(end) from ground where ground.user_id=rules.user_id) as ge,
@@ -37,16 +55,21 @@ $sql_lst = "select child.user_id,name,description,
             max(if(days=$weekdays,morning,null)) as s_to
             from rules inner join child on child.user_id=rules.user_id group by name";
 $res = $mysqli->query($sql_lst);
+# Show a child per row
 while ($row = $res->fetch_assoc()) {
    $id  = $row['user_id'];
+   # See if there is a new time for all and this child is in the selection
    if (($four) && (($sall) || (isset($_GET['sel'.$id])))) {
+      # Otherwise set the times from the form
       $wst = $awst; $wnd = $awnd; $sst = $asst; $snd = $asnd;
    } else {
+      # Check if there are new individual times set, if not set them from the database
       $wst = (isset($_GET['w_start'.$id])) ? $_GET['w_start'.$id] : $row['w_fm'];
       $wnd = (isset($_GET['w_end'.$id]))   ? $_GET['w_end'.$id]   : $row['w_to'];
       $sst = (isset($_GET['s_start'.$id])) ? $_GET['s_start'.$id] : $row['s_fm'];
       $snd = (isset($_GET['s_end'.$id]))   ? $_GET['s_end'.$id]   : $row['s_to'];
    }
+   # Update the school night and weekend times
    $mysqli->query("update rules set night='$wst', morning='$wnd' where user_id='$id' and days='$weekend'");
    $mysqli->query("update rules set night='$sst', morning='$snd' where user_id='$id' and days='$weekdays'");
 }
@@ -75,16 +98,18 @@ if ($grni != '') {
             } else {
                $end = "'".date("Y-m-d",time()+86400)." ".$grnt."'";
             }
+         # Set the end from the date and time
          } else {
             $end = "'$grnd $grnt'";
          }
       }
+      # Insert or update the grounded child
       $res = $mysqli->query("select * from ground where user_id='$grni'");
       $sql = ($res->num_rows == 0) ? "insert into ground values ('$grni',now(),$end)" : "update ground set start=now(), end=$end where user_id='$grni'";
    }
    $mysqli->query($sql);
 }
-
+# Same for the reward entry
 if ($rewi != '') {
    if ($rewu == '0') {
       $sql = "delete from reward where user_id='$rewi'";
@@ -114,7 +139,7 @@ if ($rewi != '') {
    }
    $mysqli->query($sql);
 }
-# Get the IP address to display
+# Get the IP address to display when the parent hovers over the Bedtime header
 $res = $mysqli->query("select value from settings where variable='myip'");
 $numrows = $res->num_rows;
 if ($numrows != 0) {
@@ -133,9 +158,11 @@ if ($numrows != 0) {
 <h2>Edit bedtimes</h2>
 <form name="main">
 <?php
+# Run the sql query for the children bedtimes table
 $res = $mysqli->query($sql_lst);
 $numrows = $res->num_rows;
 if ($numrows == 0) {
+   # No children entered - refer to the add child script
    echo "You have not entered any children yet. <a href=\"addchild.php\">Add a child</a>\n";
 } else {
    $children = array();
@@ -151,15 +178,20 @@ if ($numrows == 0) {
       $wf = $row['w_fm'];$wt = $row['w_to']; $sf = $row['s_fm']; $st = $row['s_to'];
       $en = ''; $rn = ''; $gn = '';
       $nl = (isset($_GET["l_$id"])) ? $_GET["l_$id"] : '';
+      # If there is a reward or a ground set, display a bold R and/or G respectively
       if ($row['rc'] > 0) { $rn = " <strong>R</strong>"; $en = "reward ends ".$row['re']; }
       if ($row['gc'] > 0) { $gn = " <strong>G</strong>"; $en = "ground ends ".$row['ge']; }
+      # See if there is a new description
       if (($nl <> '') && ($nl <> $ds)) {
          $ds = $nl;
          $mysqli->query("update child set description='$ds' where user_id=$id");
       }
+      # Set the hover text to the end time(s)
       echo "<tr><td><div title =\"$en\">$cn $gn $rn</div></td>";
       echo "<td align=\"right\"><input type=\"text\" value=\"$ds\" name=\"l_$id\"></td><td align=\"right\">";
+      # Show the selection box
       echo "<input type=\"checkbox\" name=\"sel$id\" value=\"sel$id\"></td>\n";
+      # And the four times
       echo "<td align=\"right\"><input type=\"text\" name=\"w_start$id\" value=\"$wf\" size=\"8\"></td>\n";
       echo "<td align=\"right\"><input type=\"text\" name=\"w_end$id\" value=\"$wt\" size=\"8\"></td>\n";
       echo "<td align=\"right\"><input type=\"text\" name=\"s_start$id\" value=\"$sf\" size=\"8\"></td>\n";
@@ -174,6 +206,7 @@ if ($numrows == 0) {
 <select name="ground">
 <option value=""></option>
 <?php
+# Create the drop-down list for the ground selection
 foreach ($children as $id => $name) {
    echo "<option value=\"$id\">$name</option>\n";
 }
@@ -188,6 +221,7 @@ foreach ($children as $id => $name) {
 <select name="reward">
 <option value=""></option>
 <?php
+# Same for rewards
 foreach ($children as $id => $name) {
    echo "<option value=\"$id\">$name</option>\n";
 }
@@ -213,11 +247,13 @@ $numrows = $res->num_rows;
 if ($numrows != 0) {
    $row = $res->fetch_assoc();
    date_default_timezone_set($row['value']);
+   # Show the refresh time to convince teenagers that the local time is correct
    echo "Last refresh: ".date("H:i" ,time());
 }
 echo "<br><br>\n";
-$res = squery("select value from settings where variable='version'",$mysqli);
-$ver = $res['value'];
+# Common version footer
+$res = $mysqli->query("select value from settings where variable='version'");
+$row = $res->fetch_assoc(); $ver = $row['value'];
 echo "<div class=\"version\">\n";
 echo "<p>Bedtime version $ver</p>\n";
 echo "</div>\n";

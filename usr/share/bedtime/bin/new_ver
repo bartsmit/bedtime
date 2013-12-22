@@ -1,14 +1,27 @@
 #!/usr/bin/perl
 
+# This script expands the downloaded tarball
+# with the latest version and runs any 
+# upgrade shell script therein
+
 BEGIN {push @INC,'/usr/share/bedtime/bin'}
 
 use BedtimeDB qw(get_val set_val);
 use warnings;
 use strict;
 
+# Get the verion number of the shiny new tarball
 my $latest = get_val('latest');
-if ((-e "/tmp/bedtime-$latest.tgz") && !(get_val('version') eq $latest)) {
-   system("tar xzf /tmp/bedtime-$latest.tgz -C / --strip-components=1");
+# See where the upgrade php script left it
+my $file = `find /tmp -name bedtime-$latest.tgz`;
+# Check that there is a tarball to restore and that the version is not the current one
+if ((length($file) > 1)&& !(get_val('version') eq $latest)) {
+   # Get rid of any old upgrade file
+   unlink "/usr/share/bedtime/upgrade.sh";
+   # Extract the tarball to the root directory
+   system("tar xzf $file -C / --strip-components=1");
+   # Run any new upgrade script supplied
    system("bash /usr/share/bedtime/upgrade.sh") if (-e "/usr/share/bedtime/upgrade.sh");
+   # Update the database with the new version
    set_val('version',$latest);
 }

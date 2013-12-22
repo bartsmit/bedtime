@@ -1,7 +1,14 @@
 #!/usr/bin/perl
 
+# This script converts the DHCP interface
+# to a static configuration with the same
+# IP, netmask, DNS and default gateway
+# The static IP will persist when the router
+# DHCP is disabled and bedtime becomes DHSP
+
 BEGIN {push @INC,'/usr/share/bedtime/bin'}
 
+# We need the resolver module to test DNS servers
 use warnings;
 use strict;
 use Net::DNS::Resolver;
@@ -12,11 +19,16 @@ open (NET, "/usr/share/bedtime/network");
 my ($myip,$mydg,$dhcp,$mask,$myif);
 foreach (<NET>) {
    chomp;
+   # Forward slash is the delimiter in the network file
    my @bits = split(/\//);
+   # If dhcp is after the /
    if ($bits[1] eq 'dhcp') {
+      # then we have the DHCP server
       $dhcp = $bits[0];
+   # Same for the default gateway
    } elsif ($bits[1] eq 'dg') {
       $mydg = $bits[0];
+   # Which leaves the interface line
    } elsif ($bits[1] =~ m/m$/) {
       $myip = $bits[0];
       $mask = $bits[1];
@@ -38,6 +50,7 @@ set_val('myif',$myif);
 my @opendns = ('208.67.222.222','208.67.220.220');
 my @googles = ('8.8.8.8','8.8.4.4');
 my @ispdns;
+# Read the resolvers issued by the router
 open (DNS,"/etc/resolv.conf");
 my @dns = <DNS>; close DNS;
 foreach (@dns) {
@@ -59,17 +72,22 @@ if (get_val('dns') eq 'isp') {
 # Survival of the fittest
 my $i = 0; my @nameservers;
 foreach (@alldns) {
+   # Only resolvers that pass the test are allowed
    if (dnstst($_)) {
       push (@nameservers, $_);
       $i++;
+      # Add 1,2 and 3 to the database
       set_val("dns$i",$_);
+      # No point in adding more
       last if ($i > 2);
    }
 }
 
-# Change the interface to static
+# Change the interface to static. If not already done
 if (`grep $myip /etc/sysconfig/network-scripts/ifcfg-$myif | wc -l` == 0) {
+   # Back up the ifcfg script
    system("cp -f /etc/sysconfig/network-scripts/ifcfg-$myif /etc/sysconfig/network-scripts/ifcfg-$myif.bak");
+   # And write the new one
    open (CFG,">/etc/sysconfig/network-scripts/ifcfg-$myif");
    print CFG "DEVICE=$myif\n";
    print CFG "ONBOOT=yes\n";
@@ -104,13 +122,17 @@ if (-e "/etc/init.d/network") {
 
 #### subroutines ####
 
+# Test the potential resolver
 sub dnstst {
    my $tstsrv = shift;
+   # Create a test resolution with 2 second time-outs
    my $res = Net::DNS::Resolver->new (
       nameservers => [($tstsrv)],
       udp_timeout => 2,
       tcp_timeout => 2,
    );
+   # A working resolver will find the root SOA from its hints
    my $query = $res->search(".","SOA");
+   # And return a non-empty response
    return $query;
 }

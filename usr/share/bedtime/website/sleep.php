@@ -1,7 +1,12 @@
 <?php
+# This script is used as the target for the rewrite rule in Squid. 
+# After bedtime, this page renders the sleep jpeg
+# Connect to the database
 include "dbconn.php";
-$res = squery("select value from settings where variable = 'myip'",$mysqli);
-$myip = $res['value'];
+# Then pick up the IP of the server
+$res = $mysqli->query("select value from settings where variable = 'myip'");
+$row = $res->fetch_assoc(); $myip = $row['value'];
+# Render the image with as little caching as possible
 ?>
 <html><head><title>Time to go to sleep</title>
 <meta http-equiv="cache-control" content="max-age=0" />

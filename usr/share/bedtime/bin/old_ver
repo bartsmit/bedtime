@@ -1,11 +1,21 @@
 #!/usr/bin/perl
 
+# This script reverts to the RPM version
+# It is often better to download that
+# version again and just restore the
+# database, but each to their own
+
 BEGIN {push @INC,'/usr/share/bedtime/bin'}
 
 use BedtimeDB qw(get_val set_val);
 use warnings;
 use strict;
 
+# Grab the version number from the RPM
 my $rpm = get_val('rpm');
+# Force a repair of the files
+# There is a definite change this will leave a mess
+# Caveat emptor
 system("rpm -U --force /root/bedtime-$rpm.noarch.rpm");
+# Ever the optimist, set the current version to that of the RPM
 set_val('version',$rpm);

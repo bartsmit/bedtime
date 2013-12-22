@@ -1,8 +1,15 @@
 #!/usr/bin/perl
 
+
+# This script sets up the /etc/bedtime.conf
+# configuration file with the MySQL password
+# for the bedtime user. It logs success and
+# calls with an empty password
+
 use warnings;
 use strict;
 
+# Read in the password argument from the daemon
 my $pass = $ARGV[0];
 my $conf = '';
 
@@ -12,6 +19,7 @@ if (length($pass) < 1) {
 } else {
    # Read the conf file into an array
    `logger cfsetup was called with password $pass`;
+   # Read the confiruration file into the @lines array
    open (CONF, "/etc/bedtime.conf");
    my @lines = <CONF>;
    close CONF;
@@ -22,6 +30,7 @@ if (length($pass) < 1) {
          # Replace the password
          $conf .= "$`$& = $pass\n";
       } else {
+         # Write through any other lines
          $conf .= $line;
       }
    } 

@@ -1,7 +1,13 @@
 #!/usr/bin/perl
 
-BEGIN {push @INC,'/usr/share/bedtime/bin'}
+# This script reads in the DHCP leases
+# and writest them to the database
+# It is called on the hour and whenever
+# the devices page is loaded
 
+BEGIN {push @INC,'/usr/share/bedtime/bin'}
+# use DBI and BedtimeDB to connect to the database
+# and LWP to make an API call to the vendor lookup
 use BedtimeDB qw(dbconn get_val);
 use LWP::Simple qw(get);
 use DBI;
@@ -25,6 +31,7 @@ my $sth = $dbh->prepare("select lpad(hex(mac),12,'0') as mac, inet_ntoa(ip) as i
 $sth->execute;
 while (my @row = $sth->fetchrow_array) {
    my ($mac,$ip) = (@row);
+   # Add the database MAC to the hash if it's not already there
    $devices{$mac} = $ip unless exists($devices{$mac});
 }
 
@@ -43,7 +50,7 @@ foreach my $dev (@devs) {
       $new{$mac} = $ip unless exists($devices{$mac});
    }
 }
-
+# For each of the new devices, add the MAC and IP to the database
 while ((my $mac, my $ip)=each(%new)) {
    my $sth = $dbh->prepare("select count(*) from device where lpad(hex(mac),12,'0')=lpad('$mac',12,'0');") or die "Cannot prepare query: $dbh->errstr";
    my $res = $sth->execute or die "Cannot execute query: $sth->errstr";

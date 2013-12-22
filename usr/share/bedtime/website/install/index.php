@@ -45,8 +45,6 @@ if (isset($_GET['sqlrootpw'])) {
             # Two identical strings. Set the new password
             $mysqli = new mysqli('localhost','root','','mysql');
             $mysqli->query("update mysql.user set password=password('$rootpass') where user='root'");
-            # Make sure the mysql time zone table is copied
-            $mysqli->query("create table if not exists bedtime.time_zone_name select * from mysql.time_zone_name");
             # Send the new password to the perl daemon with the 'c' switch.
             # This will set the OS root password to the same as the MySQL one.
             $sock = socket_create(AF_INET,SOCK_STREAM,SOL_TCP);
@@ -80,8 +78,6 @@ if (isset($_GET['sqlrootpw'])) {
       }
    } else {
       # We're in with the right MySQL root password.
-      # Copy the time zone table from mysql if not there
-      $mysqli->query("create table if not exists bedtime.time_zone_name select * from mysql.time_zone_name");
       # set a random password for the sleepy user as per above
       $pass = substr(md5(uniqid()), 0, 12);
       $mysqli->query("delete from mysql.user where user='sleepy'");

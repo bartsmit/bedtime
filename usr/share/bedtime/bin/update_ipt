@@ -1,5 +1,12 @@
 #!/usr/bin/perl
 
+# This script is the business end of the application
+# It writes iptables commands filtering MAC addresses
+# with start and stop times from the rules
+# It works well for iptables 1.4.11 and later
+# but is commonly out by an hour on older veraions
+# prompting the mvoe from CentOS 6 to Fedora
+
 BEGIN {push @INC,'/usr/share/bedtime/bin'}
 
 use BedtimeDB qw(get_val);
@@ -64,6 +71,7 @@ if ($bork) {
 }
 $sth->execute();
 
+# Add the rule times and MAC to the forward and prerouting chains
 while (my @row = $sth->fetchrow_array) {
    my ($mac, $start, $stop) = (@row);
    $mac = join(':',( lc($mac) =~ m/../g ));
@@ -115,7 +123,6 @@ while (my @row = $sth->fetchrow_array) {
    $tables .= "--utc " unless ($bork);
    $tables .= "-p tcp ! -d $myip --dport 80 -j REDIRECT --to-ports 3128\n";
 }
-
 
 # And the ground rules
 if ($bork) {
@@ -171,5 +178,7 @@ while (my @row = $sth->fetchrow_array) {
    $tables .= "-j ACCEPT\n";
 }
 
+# Run the new iptables commands
+# and save them in sysconfig
 system($tables);
 system("iptables-save > /etc/sysconfig/iptables");

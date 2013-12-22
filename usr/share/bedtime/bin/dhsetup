@@ -1,5 +1,9 @@
 #!/usr/bin/perl
 
+# This script performs the setup of the DHCP
+# configuration file from the information
+# gathered by the survey and ifsetup scripts
+
 BEGIN {push @INC,'/usr/share/bedtime/bin'}
 
 use warnings;
@@ -56,14 +60,19 @@ foreach (@excludes) {
 # Set up the DHCP configuration
 my $conf = '';
 my $dns_servers = '';
+# DNS servers are tested by ifsetup and added to the database
 for (my $i=1;$i<4;$i++) {
    my $dns = get_val("dns$i");
    $dns_servers .= "$dns," unless length($dns) < 7;
 }
+# convert the trailing comma to a semicolon
 $dns_servers =~ s/,$/;/;
+# If the dhcpd.conf does not already contain our network
 if ((-e "/etc/dhcp/dhcpd.conf") &&
    (`grep $network /etc/dhcp/dhcpd.conf | wc -l` == 0)) {
+   # Then back it up
    `cp -f /etc/dhcp/dhcpd.conf /etc/dhcp/dhcpd.conf.bak`;
+   # and set the new values
    open (CFG,">/etc/dhcp/dhcpd.conf");
    $conf  = "authoritative;\ndefault-lease-time 3600;\nmax-lease-time 14400;\n";
    $conf .= "option subnet-mask $netmask;\noption routers $myip;\n";
@@ -109,5 +118,5 @@ $conf .= "net.ipv4.ip_forward = 1\n" unless $find;
 open (CONF, ">/etc/sysctl.conf");
 print CONF $conf;
 close CONF;
-
+# Let the routing change take effect
 system("sysctl -p");

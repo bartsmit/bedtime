@@ -1,7 +1,12 @@
 #!/usr/bin/perl
 
-BEGIN {push @INC,'/usr/share/bedtime/bin'}
+# This is the daemon script for the bedtime application.
+# It listens on port 5000 and dispatches a script from
+# the /usr/share/bedtime/bin directory to perform actions
+# that are privileged and/or not suitable for the PHP scripts
+# that make up the website part of the application
 
+# Standard directives with socket specific modules
 use strict;
 use warnings;
 use POSIX qw( setsid );
@@ -14,13 +19,16 @@ my $socket = IO::Socket::INET->new(
    'Listen'    => 5,
    'Reuse'     => 1,
 );
+# Drop out if all is not well
 die "Cannot open socket on port 5000: $!" unless ($socket);
 
 # Disconnect from the terminal
 chdir '/' or die "Cannot cd to /: $!";
 open STDIN, '/dev/null' or die "Cannot read /dev/null: $!";
 open STDOUT, '>/dev/null' or die "Cannot write /dev/null: $!";
+# Fork to the daemon
 defined(my $pid = fork) or die "Cannot fork: $!";
+# and kill the parent. This leaves the daemon detached
 exit if $pid;
 setsid or die "Cannot start new session: $!";
 open STDERR, '>&STDOUT' or exec("logger Cannot duplicate output: $!");
@@ -43,6 +51,9 @@ close PID;
 # c = change root pass
 while ( my $client = $socket->accept() ) {
    chomp ( my $input = <$client> );
+   # Echo the input to the log/journal
+   # Yes, this is insecure but since the only login is root
+   # Having a child read the logs is the least of your problems
    system("logger socket 5000 received $input");
    system("/usr/share/bedtime/bin/update_ipt") if $input =~ /^u/;
    system("/usr/share/bedtime/bin/dhcp_slurp") if $input =~ /^d/;
@@ -69,5 +80,6 @@ while ( my $client = $socket->accept() ) {
       $input =~ s/^c//;
       system("echo \"root:$input\" | chpasswd");
    }
+   # Close the socket connection
    close $client;
 }

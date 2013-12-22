@@ -1,5 +1,9 @@
 #!/usr/bin/perl
 
+# This script tidies up the leases file
+# by removing MAC addresses marked for
+# deletion in the devices page
+
 BEGIN {push @INC,'/usr/share/bedtime/bin'}
 
 use BedtimeDB qw(get_val);
@@ -7,6 +11,7 @@ use DBI;
 use warnings;
 use strict;
 
+# Only argument is the MAC to be culled
 my $kmac = $ARGV[0];
 
 # Change to colon delimited lowercase MAC
@@ -26,6 +31,7 @@ my $newleases = '';
 foreach my $dev (@devs) {
    # See if this lease is to be kept
    $dev =~ s/\n\n/\n/g;
+   # That is, write those that don't have the MAC to be snuffed
    $newleases .= "lease $dev" unless ($dev =~ m/hardware ethernet $kmac/);
 }
 # Remove lease decrlartions on comment lines

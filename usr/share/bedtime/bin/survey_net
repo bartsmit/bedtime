@@ -1,5 +1,8 @@
 #!/usr/bin/perl
 
+# This script scans the network settings
+# and puts the results in the database
+
 #use warnings;
 use strict;
 

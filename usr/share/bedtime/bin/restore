@@ -1,33 +1,55 @@
 #!/usr/bin/perl
 
+# This script does the work for the
+# restore php script in sanitising
+# the sql dump it picked up
+# and piping it to the database
+
 BEGIN {push @INC,'/usr/share/bedtime/bin'}
 
 use BedtimeDB qw(getconf);
 use warnings;
 use strict;
 
+# The only argument is the filename of the ZIP
+# containing the sql dump file
 my $file = $ARGV[0];
 my $msql = '';
 
-unlink "/tmp/$file";
+# Private Tmp can hide the apparent /tmp for PHP
+# to some directory under /tmp.
+# We know what we're looking for though
+$file = `find /tmp -name $file`;
 
+# All we need is the path/name. Remove the ZIP file
+unlink "$file";
+
+# Point to the sql script with the same date/time
 $file =~ s/.zip$/.sql/;
-$file =~ s/^backup/dump/;
+$file =~ s/backup/dump/;
 
-open (SQL,"/tmp/$file") or die "Cannot open sql restore $file - $!\n";
+# Read the file in an array
+open (SQL,"$file") or die "Cannot open sql restore $file - $!\n";
 my @sql = <SQL>; close SQL;
 
+# iterate over each line
 foreach my $line (@sql) {
+   # Create tables more carefully
    $line =~ s/CREATE TABLE/CREATE TABLE IF NOT EXISTS/g;
+   # And replace where possible. All restored tables have keys
    $line =~ s/INSERT INTO/REPLACE INTO/g;
    $msql .= $line;
 }
 
-open (SQL,">/tmp/$file") or die "Cannot open sql restore $file - $!\n";
+# Write the array back to the file
+open (SQL,">$file") or die "Cannot open sql restore $file - $!\n";
 print SQL $msql;
 close SQL;
 
+# Get the credentials from bedtime.conf
 my ($host,$db,$user,$pass) = getconf();
-system("mysql bedtime -u $user -p$pass < /tmp/$file");
+# And restore the tables from the sql dump
+system("mysql bedtime -u $user -p$pass < $file");
 
-unlink "/tmp/$file";
+# Finally delete the sql dump file
+unlink "$file";
