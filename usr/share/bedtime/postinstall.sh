@@ -44,28 +44,28 @@ ip6tables-save > /etc/sysconfig/ip6tables
 if hash systemctl 2>/dev/null; then
    cp /usr/share/bedtime/bedtime.service /lib/systemd/system/
    systemctl daemon-reload
-   systemctl start mysqld.service
    systemctl enable mysqld.service
-   systemctl start mariadb.service
+   systemctl start mysqld.service
    systemctl enable mariadb.service
-   systemctl start squid.service
+   systemctl start mariadb.service
    systemctl enable squid.service
-   systemctl start ntpd.service
+   systemctl start squid.service
    systemctl enable ntpd.service
-   systemctl start iptables.service
+   systemctl start ntpd.service
    systemctl enable iptables.service
+   systemctl start iptables.service
    systemctl unmask ip6tables.service
-   systemctl start ip6tables.service
    systemctl enable ip6tables.service
-   apachectl start
+   systemctl start ip6tables.service
    systemctl enable httpd.service
+   apachectl start
    systemctl unmask avahi-daemon.socket
    systemctl unmask avahi-daemon.service
-   systemctl start avahi-daemon.service
    systemctl enable avahi-daemon.service
+   systemctl start avahi-daemon.service
    systemctl enable dhcpd.service
-   systemctl start bedtime.service
    systemctl enable bedtime.service
+   systemctl start bedtime.service
 else
    /etc/init.d/mysqld start
    chkconfig mysqld on
