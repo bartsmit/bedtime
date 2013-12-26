@@ -53,7 +53,8 @@ $sql_lst = "select child.user_id,name,description,
             max(if(days=$weekend, morning,null)) as w_to,
             max(if(days=$weekdays,night,null)) as s_fm,
             max(if(days=$weekdays,morning,null)) as s_to
-            from rules inner join child on child.user_id=rules.user_id group by name";
+            from rules inner join child on child.user_id=rules.user_id
+            where child.user_id > 0 group by name";
 $res = $mysqli->query($sql_lst);
 # Show a child per row
 while ($row = $res->fetch_assoc()) {

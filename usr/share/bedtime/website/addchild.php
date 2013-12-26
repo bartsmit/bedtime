@@ -59,7 +59,7 @@ if (($name != '') && ($copy == 'copy') && ($orig != '')) {
    echo "<h1>Add/Remove a Child</h1><h2>Add</h2>";
    echo "<form name=\"addchild\">\n";
    # See if there is a child in the database
-   $res = $mysqli->query("select user_id,name from child order by name");
+   $res = $mysqli->query("select user_id,name from child where user_id > 0 order by name");
    $numrows = $res->num_rows;
    if ($numrows > 0) {
       # At least one child so offer the copy option

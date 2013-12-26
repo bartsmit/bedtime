@@ -33,8 +33,8 @@ socket_write($sock,$buf,strlen($buf));
 # Create an array matching child ID to name
 $res = $mysqli->query("select user_id, name from child order by name");
 $numrows = $res->num_rows;
-# Check if any children are in the database
-if ($numrows > 0) {
+# Check if any children other than by-pass are in the database
+if ($numrows > 1) {
    $children = array();
    while ($obj = $res->fetch_object()) {
       $id = $obj->user_id;

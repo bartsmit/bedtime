@@ -65,3 +65,34 @@ while ((my $mac, my $ip)=each(%new)) {
    $sth = $dbh->prepare($sql) or die "Cannot prepare query: $dbh->errstr";
    $res = $sth->execute or die "Cannot execute query: $sth->errstr";
 }
+
+# Compare dhcpd.conf with the database
+my $oldconf = do {
+   local $/ = undef;
+   open my $fh, '<', '/etc/dhcp/dhcpd.conf'
+      or die "could not open conf: $!";
+   <$fh>;
+};
+my @conf = split(/group/,$oldconf);
+
+# Get the bypass MAC's from the database
+my $mydg = get_val('mydg');
+my $newconf = " {\n   option routers $mydg;\n";
+$sth = $dbh->prepare("select lpad(hex(mac),12,'0') as mac, inet_ntoa(ip) as ip from device where user_id=-1 order by mac");
+$sth->execute;
+my $host = 1;
+while (my @row = $sth->fetchrow_array) {
+   my ($mac,$ip) = (@row);
+   $mac = join(':',( uc($mac) =~ m/../g));
+   $newconf .= "   host client$host {\n      hardware ethernet $mac;\n      fixed-address $ip;\n   }\n";
+   $host++;
+}
+$newconf .= "}\n";
+
+if ($conf[1] ne $newconf) {
+   # Changes in the by-pass group
+   open (CONF,'>/etc/dhcp/dhcpd.conf');
+   print CONF $conf[0]."group$newconf";
+   # Restart dhcp
+   system("systemctl restart dhcpd.service");
+}

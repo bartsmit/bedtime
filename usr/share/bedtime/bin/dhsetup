@@ -78,6 +78,7 @@ if ((-e "/etc/dhcp/dhcpd.conf") &&
    $conf .= "option subnet-mask $netmask;\noption routers $myip;\n";
    $conf .= "option domain-name-servers $dns_servers\n";
    $conf .= "subnet $network netmask $netmask {\n$ranges}\n";
+   $conf .= "group {\n}\n";
    print CFG $conf;
    close CFG;
 }

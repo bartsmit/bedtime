@@ -53,8 +53,6 @@ create table parent (
    primary key (parent_id)
 ) engine=MyISAM default charset=latin1 comment 'Authentication table for parent logins';
 
-insert into parent (name,password,description) values('admin',md5('admin'),'delete me');
-
 drop table if exists rules;
 create table rules (
    user_id mediumint(9)        not null                comment 'glue record between tables',
@@ -72,6 +70,8 @@ create table settings (
    primary key (variable)
 ) engine=MyISAM default charset=latin1 comment 'Miscellaneous settings for internal use';
 
+insert into parent (name,password,description) values('admin',md5('admin'),'delete me');
+insert into child values (-1,'[ By-Pass ]','Go directly to the router');
 insert into settings values('weekend','12');
 insert into settings values('rpm','1.1-0');
 insert into settings values('version','1.1-0');
