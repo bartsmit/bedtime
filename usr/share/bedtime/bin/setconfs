@@ -7,7 +7,7 @@ use strict;
 use warnings;
 
 # Read the Squid configuration file
-open (CONF, "/etc/squid/squid.conf");
+open (CONF, "/etc/squid3/squid.conf");
 my @lines = <CONF>; close CONF;
 
 # Set the conf output string and the rewrite line boolean
@@ -35,11 +35,11 @@ $conf .= "url_rewrite_program /usr/share/bedtime/bin/sleep.pl\n" unless $rewl;
 $conf .= "visible_hostname bedtime.local\n" unless $hosl;
 
 # Write the new conf file
-open (CONF, ">/etc/squid/squid.conf");
+open (CONF, ">/etc/squid3/squid.conf");
 print CONF "$conf"; close CONF;
 
 # Now for the httpd config
-open (CONF, "/etc/httpd/conf/httpd.conf");
+open (CONF, "/etc/apache2/apache2.conf");
 @lines = <CONF>; close CONF;
 
 # Add or change the ServerName to bedtime.local:80
@@ -54,7 +54,7 @@ foreach my $line (@lines) {
 }
 
 # Write the new apache conf file
-open (CONF, ">/etc/httpd/conf/httpd.conf");
+open (CONF, "> /etc/apache2/apache2.conf");
 print CONF "$conf"; close CONF;
 
 # We need explicit allow for apache 2.4
@@ -68,5 +68,5 @@ if ((`httpd -v | grep Apache/2.4 | wc -l` > 0) &&
 }
 # Last line is the alias
 $conf .= "Alias /bedtime /usr/share/bedtime/website\n";
-open (CONF, ">/etc/httpd/conf.d/bedtime.conf");
+open (CONF, ">/etc/apache2/conf.available/bedtime.conf");
 print CONF "$conf"; close CONF;
