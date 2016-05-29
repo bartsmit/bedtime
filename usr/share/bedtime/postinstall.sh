@@ -35,6 +35,7 @@ ip6tables -A INPUT -j REJECT --reject-with icmp6-adm-prohibited
 ip6tables-save > /etc/iptables/rules.v6
 
 /usr/share/bedtime/bin/setconfs
+ln -s /etc/apache2/sites-available/bedtime.conf /etc/apache2/sites-enabled/bedtime.conf
 
 cp /usr/share/bedtime/bedtime.service /lib/systemd/system/
 systemctl daemon-reload
